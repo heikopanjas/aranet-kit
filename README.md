@@ -6,6 +6,7 @@ A Swift command-line tool for interacting with Aranet Bluetooth sensors (Aranet4
 
 - **Scan** for nearby Aranet devices
 - **Read** current sensor measurements (CO2, temperature, humidity, pressure, battery)
+- **Progress indicators** - Visual feedback during scanning and connecting
 - **No pairing required** - reads directly from BLE characteristics
 - Native Swift performance with CoreBluetooth
 - Async/await based API

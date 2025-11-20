@@ -32,12 +32,23 @@ extension AranetCTL {
         var verbose: Bool = false
 
         mutating func run() async throws {
-            print("Scanning for Aranet devices...")
+            let spinner = await ProgressSpinner(message: "Scanning for Aranet devices...")
+
+            if !verbose {
+                await spinner.start()
+            }
+            else {
+                print("Scanning for Aranet devices...")
+            }
 
             do {
                 let client = AranetClient()
                 client.verbose = verbose
                 let devices = try await client.scan(timeout: timeout)
+
+                if !verbose {
+                    await spinner.stop()
+                }
 
                 if devices.isEmpty {
                     print("No devices found.")
@@ -50,6 +61,9 @@ extension AranetCTL {
                 }
             }
             catch let error as AranetError {
+                if !verbose {
+                    await spinner.fail(message: "Scan failed")
+                }
                 print("Error: \(error.description)")
                 throw ExitCode.failure
             }
@@ -72,7 +86,14 @@ extension AranetCTL {
         var verbose: Bool = false
 
         mutating func run() async throws {
-            print("Scanning for device '\(device)'...")
+            let scanSpinner = await ProgressSpinner(message: "Scanning for device '\(device)'...")
+
+            if !verbose {
+                await scanSpinner.start()
+            }
+            else {
+                print("Scanning for device '\(device)'...")
+            }
 
             do {
                 let client = AranetClient()
@@ -85,17 +106,35 @@ extension AranetCTL {
                             || $0.name?.lowercased().contains(device.lowercased()) == true
                     })
                 else {
+                    if !verbose {
+                        await scanSpinner.fail(message: "Device not found")
+                    }
                     print("Error: Device not found")
                     throw ExitCode.failure
                 }
 
-                print("Connecting to \(peripheral.name ?? "device")...")
+                if !verbose {
+                    await scanSpinner.succeed(message: "Found \(peripheral.name ?? "device")")
+                }
+
+                let connectSpinner = await ProgressSpinner(message: "Connecting to \(peripheral.name ?? "device")...")
+                if !verbose {
+                    await connectSpinner.start()
+                }
+                else {
+                    print("Connecting to \(peripheral.name ?? "device")...")
+                }
 
                 if verbose {
                     print("[DEBUG] Starting read operation...")
                 }
 
                 let reading = try await client.readCurrentReadings(from: peripheral)
+
+                if !verbose {
+                    await connectSpinner.succeed(message: "Connected to \(peripheral.name ?? "device")")
+                }
+
                 print(reading.formatOutput())
             }
             catch let error as AranetError {
