@@ -1,0 +1,24 @@
+{
+  "configurations": [
+    {
+      "type": "swift",
+      "request": "launch",
+      "args": [],
+      "cwd": "${workspaceFolder:aranetctl}",
+      "name": "Debug aranetctl",
+      "target": "aranetctl",
+      "configuration": "debug",
+      "preLaunchTask": "swift: Build Debug aranetctl"
+    },
+    {
+      "type": "swift",
+      "request": "launch",
+      "args": [],
+      "cwd": "${workspaceFolder:aranetctl}",
+      "name": "Release aranetctl",
+      "target": "aranetctl",
+      "configuration": "release",
+      "preLaunchTask": "swift: Build Release aranetctl"
+    }
+  ]
+}
