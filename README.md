@@ -52,13 +52,6 @@ swift run aranetctl scan --timeout 10
 ```
 
 Example output:
-```
-Scanning for Aranet devices...
-Found 1 device(s):
-
-1. Aranet4 228EB (B6F33CE5-4712-5841-C308-B4217CDAFD68)
-```
-
 Example output:
 
 ```text
@@ -86,7 +79,7 @@ Example output:
 Scanning for device 'Aranet4'...
 Connecting to Aranet4 228EB...
 ---------------------------------------
-Connected: Aranet4 228EB | vv1.4.19
+Connected: Aranet4 228EB | v1.4.19
 Updated 237 s ago. Intervals: 300 s
 ---------------------------------------
 CO2:          1369 ppm
@@ -123,14 +116,13 @@ If you see "Bluetooth access is not authorized", grant Bluetooth permissions:
 2. Enable Bluetooth access for Terminal or your shell application
 
 ### Device Not Found
-4. Click **Connect**
-5. Enter the PIN code shown on the device display
-6. Click **Pair** or **Connect**
-7. Run the aranetctl command again
 
-**Note**: You only need to pair once. After pairing, the device will be remembered and future connections will work automatically.
+If you get "Error: Device not found":
 
-**Alternative**: You can also pair the device using the official Aranet Home mobile app first, then use aranetctl.
+1. Run `swift run aranetctl scan` first to see available devices
+2. Use the exact device name or UUID from the scan results
+3. Device names are case-insensitive and support partial matching
+4. Ensure the device is nearby and powered on
 
 ### Bluetooth Unavailable Error
 
@@ -160,14 +152,6 @@ If scanning finds no devices:
 3. Try increasing the scan timeout: `swift run aranetctl scan --timeout 15`
 4. Check if the device is already connected to another application
 
-### Device Not Found Error
-
-If you get "Error: Device not found":
-
-1. Run `swift run aranetctl scan` first to see available devices
-2. Use the exact device name or UUID from the scan results
-3. Device names are case-insensitive and support partial matching
-
 ## Supported Devices
 
 - **Aranet4** - CO2, temperature, humidity, pressure
@@ -179,7 +163,7 @@ If you get "Error: Device not found":
 
 ### Project Structure
 
-```
+```text
 Sources/aranetctl/
 ├── aranetctl.swift      # CLI interface
 ├── AranetClient.swift   # CoreBluetooth client

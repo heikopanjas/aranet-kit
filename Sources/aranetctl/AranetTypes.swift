@@ -136,7 +136,9 @@ public struct AranetReading: Sendable {
         var output = "---------------------------------------\n"
         output += "Connected: \(name)"
         if !version.isEmpty {
-            output += " | v\(version)"
+            // Add 'v' prefix only if version doesn't already start with 'v'
+            let versionString = version.hasPrefix("v") ? version : "v\(version)"
+            output += " | \(versionString)"
         }
         output += "\n"
 

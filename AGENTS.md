@@ -1,6 +1,6 @@
 # Project Instructions for AI Coding Agents
 
-**Last updated:** 2025-11-20
+**Last updated:** 2025-11-20 14:30
 
 <!-- {mission} -->
 
@@ -1755,6 +1755,17 @@ After making ANY code changes:
 ---
 
 ## Recent Updates & Decisions
+
+### 2025-11-20 14:30 (Documentation Cleanup)
+
+- **Cleaned up README.md** to reflect no-pairing-required reality
+- **Removed duplicate sections**: Consolidated two "Device Not Found" sections into one
+- **Removed outdated pairing instructions**: Deleted misleading pairing steps that contradicted "No Pairing Required" feature
+- **Fixed formatting issues**:
+  - Removed duplicate "Example output:" headers in scan section
+  - Added language specification to code blocks (changed ``` to ```text)
+- **Improved troubleshooting clarity**: Updated Device Not Found section with clearer, more actionable steps
+- **Reasoning**: Documentation was confusing with contradictory information about pairing. After breakthrough with F0CD3001 characteristic, pairing is no longer needed for normal operation. Documentation now accurately reflects this simplified user experience.
 
 ### 2025-11-20 (Pairing Solution - WORKING!)
 
