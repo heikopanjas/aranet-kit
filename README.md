@@ -1,4 +1,4 @@
-# aranetctl
+# aranetcli
 
 A Swift command-line tool for interacting with Aranet Bluetooth sensors (Aranet4, Aranet2, Aranet Radiation, Aranet Radon Plus).
 
@@ -25,16 +25,16 @@ A Swift command-line tool for interacting with Aranet Bluetooth sensors (Aranet4
 
 ```bash
 git clone <repository-url>
-cd aranetctl
+cd <repository-directory>
 swift build -c release
 ```
 
-The compiled binary will be at `.build/release/aranetctl`
+The compiled binary will be at `.build/release/aranetcli`
 
 ### Run directly with Swift
 
 ```bash
-swift run aranetctl <command>
+swift run aranetcli <command>
 ```
 
 ## Usage
@@ -45,20 +45,19 @@ Scan for nearby Aranet devices:
 
 ```bash
 # Default 5-second scan
-swift run aranetctl scan
+swift run aranetcli scan
 
 # Custom timeout
-swift run aranetctl scan --timeout 10
+swift run aranetcli scan --timeout 10
 ```
 
-Example output:
 Example output:
 
 ```text
 Scanning for Aranet devices...
 Found 1 device(s):
 
-1. Aranet4 228EB (B6F33CE5-4712-5841-C308-B4217CDAFD68)
+1. Aranet4 228EB (A1B2C3D4-E5F6-7890-A1B2-C3D4E5F67890)
 ```
 
 ### Read sensor values
@@ -67,10 +66,10 @@ Read current measurements from a specific device:
 
 ```bash
 # By device name (partial match)
-swift run aranetctl read "Aranet4"
+swift run aranetcli read "Aranet4"
 
 # By UUID
-swift run aranetctl read "B6F33CE5-4712-5841-C308-B4217CDAFD68"
+swift run aranetcli read "A1B2C3D4-E5F6-7890-A1B2-C3D4E5F67890"
 ```
 
 Example output:
@@ -119,7 +118,7 @@ If you see "Bluetooth access is not authorized", grant Bluetooth permissions:
 
 If you get "Error: Device not found":
 
-1. Run `swift run aranetctl scan` first to see available devices
+1. Run `swift run aranetcli scan` first to see available devices
 2. Use the exact device name or UUID from the scan results
 3. Device names are case-insensitive and support partial matching
 4. Ensure the device is nearby and powered on
@@ -149,7 +148,7 @@ If scanning finds no devices:
 
 1. Ensure your Aranet device is powered on and nearby
 2. Make sure "Smart Home integrations" is enabled in the Aranet Home mobile app
-3. Try increasing the scan timeout: `swift run aranetctl scan --timeout 15`
+3. Try increasing the scan timeout: `swift run aranetcli scan --timeout 15`
 4. Check if the device is already connected to another application
 
 ## Supported Devices
@@ -168,8 +167,8 @@ Sources/
 ├── AranetKit/           # Reusable library
 │   ├── AranetClient.swift   # CoreBluetooth client
 │   └── AranetTypes.swift    # Data models and types
-└── aranetctl/           # CLI application
-    ├── aranetctl.swift      # CLI interface
+└── AranetCli/           # CLI application
+    ├── AranetCli.swift      # CLI interface
     └── ProgressSpinner.swift # Terminal UI utilities
 ```
 

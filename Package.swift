@@ -17,7 +17,7 @@ let package = Package(
         // Executable product for the CLI
         .executable(
             name: "aranetcli",
-            targets: ["aranetcli"]
+            targets: ["AranetCli"]
         )
     ],
     dependencies: [
@@ -31,7 +31,7 @@ let package = Package(
         ),
         // Executable target for the CLI application
         .executableTarget(
-            name: "aranetcli",
+            name: "AranetCli",
             dependencies: [
                 "AranetKit",
                 .product(name: "ArgumentParser", package: "swift-argument-parser")

@@ -1,12 +1,12 @@
 # Project Instructions for AI Coding Agents
 
-**Last updated:** 2025-11-22 19:15
+**Last updated:** 2025-11-22 20:05
 
 <!-- {mission} -->
 
 ## Mission Statement
 
-**aranetctl** is a Swift command-line tool for interacting with Aranet4, Aranet2, Aranet Radiation, and Aranet Radon Plus Bluetooth sensors. The project provides a modern Swift reimplementation of the Python-based aranet4 library, offering native performance and type safety for reading sensor data, fetching historical logs, and managing device settings.
+**aranetcli** is a Swift command-line tool for interacting with Aranet4, Aranet2, Aranet Radiation, and Aranet Radon Plus Bluetooth sensors. The project provides a modern Swift reimplementation of the Python-based aranet4 library, offering native performance and type safety for reading sensor data, fetching historical logs, and managing device settings.
 
 Key features:
 
@@ -118,7 +118,7 @@ When initializing a session or analyzing the workspace, refer to instruction fil
 
 *Last updated: November 22, 2025*
 
-This document defines project-specific coding conventions for aranetctl. Standard Swift conventions (naming, syntax, etc.) are assumed. Code formatting and style are managed by swift-format configuration.
+This document defines project-specific coding conventions for aranetcli. Standard Swift conventions (naming, syntax, etc.) are assumed. Code formatting and style are managed by swift-format configuration.
 
 ---
 
@@ -181,10 +181,10 @@ guard let data = data,
 
 ### Library Structure
 
-**aranetctl** follows Swift Package Manager best practices with clear separation between library and executable:
+**aranetcli** follows Swift Package Manager best practices with clear separation between library and executable:
 
 - **AranetKit** (library): Core Bluetooth client, data models, reusable components
-- **aranetctl** (executable): CLI application, command handling, user interface
+- **AranetCli** (executable): CLI application, command handling, user interface
 
 ### Controller/Service Pattern
 
@@ -587,7 +587,7 @@ After making ANY code changes:
 - **Added coding standard**: Require explicit boolean comparisons in all control flow statements
 - **Rule**: Always use `if condition == true` instead of `if condition`, and `if condition == false` instead of `if !condition`
 - **Implementation**: Updated all `if` and `while` statements throughout codebase to use explicit comparisons
-- **Files updated**: `AranetClient.swift`, `aranetctl.swift`
+- **Files updated**: `AranetClient.swift`, `AranetCli.swift`
 - **Benefits**:
   - Improved code readability
   - Makes boolean comparisons explicit and unambiguous
@@ -599,7 +599,7 @@ After making ANY code changes:
 - **Created AranetKit library target**: Separated core Bluetooth functionality from CLI application
 - **Package structure**:
   - `Sources/AranetKit/` - Library target with AranetClient and AranetTypes (reusable)
-  - `Sources/aranetctl/` - Executable target with CLI and ProgressSpinner (application-specific)
+  - `Sources/AranetCli/` - Executable target with CLI and ProgressSpinner (application-specific)
 - **Updated Package.swift**: Added library product and separate targets for library and executable
 - **Benefits**:
   - Core Aranet functionality can be imported by other Swift projects
@@ -657,10 +657,31 @@ After making ANY code changes:
 ### 2025-11-20 (Session Init)
 
 - Session initialized with proper project understanding
-- Updated Mission Statement to reflect aranetctl Swift CLI project
+- Updated Mission Statement to reflect aranetcli Swift CLI project
 - Confirmed technology stack: Swift 6.2+, Swift Argument Parser, CoreBluetooth
 - Established project as Swift reimplementation of Python aranet4 library
 - Identified key features: sensor readings, historical logs, device settings, BLE scanning
+
+### 2025-11-22 20:05 (Directory Naming - PascalCase)
+
+- **Renamed directory**: Changed `Sources/aranetcli/` to `Sources/AranetCli/` to follow Swift naming conventions
+- **Updated Package.swift**: Changed target name from `aranetcli` to `AranetCli` (executable name remains `aranetcli`)
+- **Rationale**: Swift conventions use PascalCase for module/target names
+- **Files updated**: Package.swift, AGENTS.md, README.md
+- **Consistency**:
+  - Package name: `AranetCli`
+  - Target name: `AranetCli`
+  - Directory: `Sources/AranetCli/`
+  - Executable binary: `aranetcli` (lowercase for command-line use)
+- **Reasoning**: Follows Swift Package Manager conventions where targets use PascalCase while executable products use lowercase for easier command-line usage
+
+### 2025-11-22 20:00 (Project Naming Standardization)
+
+- **Updated project name**: Changed all references from `aranetctl` to `aranetcli` throughout documentation
+- **Rationale**: Align with Package.swift configuration where executable is named `aranetcli`
+- **Files updated**: AGENTS.md references to project name, executable name, and directory structure
+- **Consistency**: Package name `AranetCli`, executable `aranetcli`, directory `Sources/aranetcli/`
+- **Reasoning**: Standardizing on `aranetcli` (CLI = Command Line Interface) provides clearer naming and matches the actual build artifacts and source structure
 
 ### 2025-10-05
 
