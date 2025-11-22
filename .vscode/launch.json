@@ -19,6 +19,26 @@
       "target": "aranetctl",
       "configuration": "release",
       "preLaunchTask": "swift: Build Release aranetctl"
+    },
+    {
+      "type": "swift",
+      "request": "launch",
+      "args": [],
+      "cwd": "${workspaceFolder:aranetctl}",
+      "name": "Debug aranetcli",
+      "target": "aranetcli",
+      "configuration": "debug",
+      "preLaunchTask": "swift: Build Debug aranetcli"
+    },
+    {
+      "type": "swift",
+      "request": "launch",
+      "args": [],
+      "cwd": "${workspaceFolder:aranetctl}",
+      "name": "Release aranetcli",
+      "target": "aranetcli",
+      "configuration": "release",
+      "preLaunchTask": "swift: Build Release aranetcli"
     }
   ]
 }

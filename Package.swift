@@ -4,7 +4,7 @@
 import PackageDescription
 
 let package = Package(
-    name: "aranetctl",
+    name: "AranetCli",
     platforms: [
         .macOS(.v12)
     ],
@@ -16,8 +16,8 @@ let package = Package(
         ),
         // Executable product for the CLI
         .executable(
-            name: "aranetctl",
-            targets: ["aranetctl"]
+            name: "aranetcli",
+            targets: ["aranetcli"]
         )
     ],
     dependencies: [
@@ -31,7 +31,7 @@ let package = Package(
         ),
         // Executable target for the CLI application
         .executableTarget(
-            name: "aranetctl",
+            name: "aranetcli",
             dependencies: [
                 "AranetKit",
                 .product(name: "ArgumentParser", package: "swift-argument-parser")

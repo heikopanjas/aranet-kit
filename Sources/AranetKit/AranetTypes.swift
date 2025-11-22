@@ -1,3 +1,16 @@
+//
+// AranetTypes.swift
+// AranetKit
+//
+// Swift reimplementation of the Python aranet4 library
+// Based on https://github.com/Anrijs/Aranet4-Python
+//
+// Copyright (c) 2022 Anrijs Jargans (original Python implementation)
+// Copyright (c) 2025 Heiko Panjas (Swift reimplementation)
+//
+// SPDX-License-Identifier: MIT
+//
+
 import Foundation
 
 // MARK: - Device Types
@@ -71,33 +84,120 @@ public enum AranetStatus: UInt8, Sendable {
 
 // MARK: - Current Reading
 
+/// A complete sensor reading from an Aranet device containing all available measurements and metadata.
+///
+/// Different Aranet devices provide different sets of measurements. Optional properties indicate
+/// device-specific sensors that may not be present on all models.
 public struct AranetReading: Sendable {
+    /// The type of Aranet device that provided this reading.
     public let deviceType: AranetDeviceType
+
+    /// The device's Bluetooth advertised name.
     public let name: String
+
+    /// The firmware version string of the device.
     public let version: String
 
-    // Aranet2, Aranet4
+    // MARK: - Aranet2, Aranet4
+
+    /// Ambient temperature measurement in degrees Celsius (°C).
+    ///
+    /// Available on: Aranet2, Aranet4, Aranet Radon Plus
     public let temperature: Double?
+
+    /// Relative humidity measurement as a percentage (%).
+    ///
+    /// Range: 0-100%
+    /// Available on: Aranet2, Aranet4, Aranet Radon Plus
     public let humidity: UInt8?
 
-    // Aranet4
+    // MARK: - Aranet4
+
+    /// Carbon dioxide concentration in parts per million (ppm).
+    ///
+    /// Typical indoor levels: 400-1000 ppm
+    /// Available on: Aranet4 only
     public let co2: UInt16?
+
+    /// Atmospheric pressure in hectopascals (hPa).
+    ///
+    /// Standard sea level pressure: ~1013 hPa
+    /// Available on: Aranet4, Aranet Radon Plus
     public let pressure: Double?
 
-    // Aranet Radiation
+    // MARK: - Aranet Radiation
+
+    /// Current radiation dose rate in nanosieverts per hour (nSv/h).
+    ///
+    /// Typical background radiation: 50-200 nSv/h (0.05-0.2 µSv/h)
+    /// Available on: Aranet Radiation only
     public let radiationRate: Double?
+
+    /// Cumulative radiation dose in nanosieverts (nSv).
+    ///
+    /// Total accumulated dose since the last counter reset.
+    /// Available on: Aranet Radiation only
     public let radiationTotal: Double?
+
+    /// Duration of radiation measurement period in seconds.
+    ///
+    /// Time span over which the total dose was accumulated.
+    /// Available on: Aranet Radiation only
     public let radiationDuration: UInt64?
 
-    // Aranet Radon
+    // MARK: - Aranet Radon
+
+    /// Radon gas concentration in becquerels per cubic meter (Bq/m³).
+    ///
+    /// WHO recommended action level: 100 Bq/m³
+    /// EPA recommended action level: 148 Bq/m³ (4 pCi/L)
+    /// Available on: Aranet Radon Plus only
     public let radonConcentration: UInt32?
 
-    // Common
+    // MARK: - Common
+
+    /// Battery charge level as a percentage (%).
+    ///
+    /// Range: 0-100%
+    /// Available on: All devices
     public let battery: UInt8
+
+    /// Current status indicator color displayed on the device.
+    ///
+    /// Reflects the device's assessment of measurement quality based on configured thresholds.
+    /// Available on: Aranet4, Aranet Radon Plus
     public let status: AranetStatusColor?
+
+    /// Measurement interval in seconds.
+    ///
+    /// Time between automatic sensor readings.
+    /// Available on: All devices
     public let interval: UInt16?
+
+    /// Time elapsed since last measurement in seconds.
+    ///
+    /// Indicates freshness of the reading data.
+    /// Available on: All devices
     public let ago: UInt16?
 
+    /// Creates a new Aranet sensor reading.
+    ///
+    /// - Parameters:
+    ///   - deviceType: Type of Aranet device
+    ///   - name: Device Bluetooth name
+    ///   - version: Firmware version string
+    ///   - temperature: Ambient temperature in °C
+    ///   - humidity: Relative humidity in %
+    ///   - co2: CO2 concentration in ppm (Aranet4)
+    ///   - pressure: Atmospheric pressure in hPa
+    ///   - radiationRate: Dose rate in nSv/h (Aranet Radiation)
+    ///   - radiationTotal: Cumulative dose in nSv (Aranet Radiation)
+    ///   - radiationDuration: Measurement duration in seconds (Aranet Radiation)
+    ///   - radonConcentration: Radon concentration in Bq/m³ (Aranet Radon Plus)
+    ///   - battery: Battery level in %
+    ///   - status: Status indicator color
+    ///   - interval: Measurement interval in seconds
+    ///   - ago: Time since last measurement in seconds
     public init(
         deviceType: AranetDeviceType = .unknown,
         name: String = "",
@@ -130,109 +230,5 @@ public struct AranetReading: Sendable {
         self.status = status
         self.interval = interval
         self.ago = ago
-    }
-
-    public func formatOutput() -> String {
-        var output = "---------------------------------------\n"
-        output += "Connected: \(name)"
-        if !version.isEmpty {
-            // Add 'v' prefix only if version doesn't already start with 'v'
-            let versionString = version.hasPrefix("v") ? version : "v\(version)"
-            output += " | \(versionString)"
-        }
-        output += "\n"
-
-        if let ago = ago, let interval = interval {
-            output += "Updated \(ago) s ago. Intervals: \(interval) s\n"
-        }
-
-        output += "---------------------------------------\n"
-
-        switch deviceType {
-            case .aranet4:
-                if let co2 = co2 {
-                    output += "CO2:          \(co2) ppm\n"
-                }
-                if let temperature = temperature {
-                    output += String(format: "Temperature:  %.1f °C\n", temperature)
-                }
-                if let humidity = humidity {
-                    output += "Humidity:     \(humidity) %\n"
-                }
-                if let pressure = pressure {
-                    output += String(format: "Pressure:     %.1f hPa\n", pressure)
-                }
-                output += "Battery:      \(battery) %\n"
-                if let status = status {
-                    output += "Status Display: \(status.name)\n"
-                }
-                if let ago = ago, let interval = interval {
-                    output += "Age:          \(ago)/\(interval) s\n"
-                }
-
-            case .aranet2:
-                if let temperature = temperature {
-                    output += String(format: "Temperature:  %.1f °C\n", temperature)
-                }
-                if let humidity = humidity {
-                    output += "Humidity:     \(humidity) %\n"
-                }
-                output += "Battery:      \(battery) %\n"
-                if let ago = ago, let interval = interval {
-                    output += "Age:          \(ago)/\(interval) s\n"
-                }
-
-            case .aranetRadiation:
-                if let radiationRate = radiationRate {
-                    output += String(format: "Dose rate:    %.2f µSv/h\n", radiationRate / 1000.0)
-                }
-                if let radiationTotal = radiationTotal, let radiationDuration = radiationDuration {
-                    let seconds = Int(radiationDuration)
-                    let minutes = (seconds / 60) % 60
-                    let hours = (seconds / 3600) % 24
-                    let days = seconds / 86400
-
-                    var durationStr = "\(minutes)m"
-                    if hours > 0 {
-                        durationStr = "\(hours)h \(durationStr)"
-                    }
-                    if days > 0 {
-                        durationStr = "\(days)d \(durationStr)"
-                    }
-
-                    output += String(format: "Dose total:   %.4f mSv/%@\n", radiationTotal / 1_000_000.0, durationStr)
-                }
-                output += "Battery:      \(battery) %\n"
-                if let ago = ago, let interval = interval {
-                    output += "Age:          \(ago)/\(interval) s\n"
-                }
-
-            case .aranetRadon:
-                if let radonConcentration = radonConcentration {
-                    output += "Radon Conc.:  \(radonConcentration) Bq/m³\n"
-                }
-                if let temperature = temperature {
-                    output += String(format: "Temperature:  %.1f °C\n", temperature)
-                }
-                if let humidity = humidity {
-                    output += "Humidity:     \(humidity) %\n"
-                }
-                if let pressure = pressure {
-                    output += String(format: "Pressure:     %.1f hPa\n", pressure)
-                }
-                output += "Battery:      \(battery) %\n"
-                if let status = status {
-                    output += "Status Display: \(status.name)\n"
-                }
-                if let ago = ago, let interval = interval {
-                    output += "Age:          \(ago)/\(interval) s\n"
-                }
-
-            case .unknown:
-                output += "Unknown device type\n"
-        }
-
-        output += "---------------------------------------"
-        return output
     }
 }

@@ -1,3 +1,16 @@
+//
+// AranetClient.swift
+// AranetKit
+//
+// Swift reimplementation of the Python aranet4 library
+// Based on https://github.com/Anrijs/Aranet4-Python
+//
+// Copyright (c) 2022 Anrijs Jargans (original Python implementation)
+// Copyright (c) 2025 Heiko Panjas (Swift reimplementation)
+//
+// SPDX-License-Identifier: MIT
+//
+
 @preconcurrency import CoreBluetooth
 import Foundation
 
