@@ -1,6 +1,6 @@
 # Project Instructions for AI Coding Agents
 
-**Last updated:** 2025-11-22 19:00
+**Last updated:** 2025-11-22 19:15
 
 <!-- {mission} -->
 
@@ -684,7 +684,20 @@ guard let url = URL(string: "https://api.example.com/data") else {
     return nil
 }
 
-// CORRECT: Multiple guard conditions
+// CORRECT: Single guard statements (preferred)
+guard let data = data else {
+    throw NetworkError.invalidResponse
+}
+
+guard let response = response as? HTTPURLResponse else {
+    throw NetworkError.invalidResponse
+}
+
+guard (200...299).contains(response.statusCode) else {
+    throw NetworkError.invalidResponse
+}
+
+// AVOID: Multiple guard conditions
 guard let data = data,
       let response = response as? HTTPURLResponse,
       (200...299).contains(response.statusCode) else {
@@ -1787,6 +1800,18 @@ After making ANY code changes:
 ---
 
 ## Recent Updates & Decisions
+
+### 2025-11-22 19:15 (Single Guard Statements)
+
+- **Updated coding standard**: Prefer single guard statements over multiple guard conditions
+- **Rule**: Use separate guard statements for each condition instead of combining them with commas
+- **Rationale**:
+  - Each guard statement has clear, specific error handling
+  - Easier to debug which condition failed
+  - More flexible for different error responses per condition
+  - Clearer code intent and better readability
+- **Example**: Instead of `guard let data = data, let response = response else { }`, use separate guards for data and response
+- **Reasoning**: Single guard statements make it easier to provide specific error messages and handle each failure case appropriately. Combined guard conditions can mask which specific condition failed during debugging.
 
 ### 2025-11-22 19:00 (Explicit Boolean Comparisons)
 
