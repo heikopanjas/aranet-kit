@@ -21,11 +21,21 @@ A Swift command-line tool for interacting with Aranet Bluetooth sensors (Aranet4
 
 ## Installation
 
+### Swift Package Manager
+
+Add to your `Package.swift`:
+
+```swift
+dependencies: [
+    .package(url: "https://github.com/heikopanjas/aranet-kit.git", from: "1.0.0")
+]
+```
+
 ### Build from source
 
 ```bash
-git clone <repository-url>
-cd <repository-directory>
+git clone https://github.com/heikopanjas/aranet-kit.git
+cd aranet-kit
 swift build -c release
 ```
 
@@ -234,7 +244,7 @@ The core Bluetooth functionality is available as a Swift package that can be imp
 ```swift
 // In your Package.swift
 dependencies: [
-    .package(url: "https://github.com/yourusername/aranetctl.git", from: "0.1.0")
+    .package(url: "https://github.com/heikopanjas/aranet-kit.git", from: "1.0.0")
 ],
 targets: [
     .target(
