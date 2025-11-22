@@ -164,10 +164,45 @@ If scanning finds no devices:
 ### Project Structure
 
 ```text
-Sources/aranetctl/
-├── aranetctl.swift      # CLI interface
-├── AranetClient.swift   # CoreBluetooth client
-└── AranetTypes.swift    # Data models and types
+Sources/
+├── AranetKit/           # Reusable library
+│   ├── AranetClient.swift   # CoreBluetooth client
+│   └── AranetTypes.swift    # Data models and types
+└── aranetctl/           # CLI application
+    ├── aranetctl.swift      # CLI interface
+    └── ProgressSpinner.swift # Terminal UI utilities
+```
+
+### Using AranetKit as a Library
+
+The core Bluetooth functionality is available as a Swift package that can be imported into your own projects:
+
+```swift
+// In your Package.swift
+dependencies: [
+    .package(url: "https://github.com/yourusername/aranetctl.git", from: "0.1.0")
+],
+targets: [
+    .target(
+        name: "YourTarget",
+        dependencies: ["AranetKit"]
+    )
+]
+
+// In your Swift code
+import AranetKit
+
+let client = AranetClient()
+
+// Scan for devices
+let devices = try await client.scan(timeout: 5.0)
+
+// Read sensor data
+if let device = devices.first {
+    let reading = try await client.readCurrentReadings(from: device)
+    print("CO2: \(reading.co2 ?? 0) ppm")
+    print("Temperature: \(reading.temperature ?? 0)°C")
+}
 ```
 
 ### Building for Development

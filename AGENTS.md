@@ -1,6 +1,6 @@
 # Project Instructions for AI Coding Agents
 
-**Last updated:** 2025-11-20 14:30
+**Last updated:** 2025-11-22 18:45
 
 <!-- {mission} -->
 
@@ -1755,6 +1755,21 @@ After making ANY code changes:
 ---
 
 ## Recent Updates & Decisions
+
+### 2025-11-22 18:45 (Library Package Architecture)
+
+- **Created AranetKit library target**: Separated core Bluetooth functionality from CLI application
+- **Package structure**:
+  - `Sources/AranetKit/` - Library target with AranetClient and AranetTypes (reusable)
+  - `Sources/aranetctl/` - Executable target with CLI and ProgressSpinner (application-specific)
+- **Updated Package.swift**: Added library product and separate targets for library and executable
+- **Benefits**:
+  - Core Aranet functionality can be imported by other Swift projects
+  - Clean separation of concerns between library code and CLI
+  - Follows Swift Package Manager best practices
+  - Enables easier testing and code reuse
+- **Import pattern**: CLI now imports `AranetKit` to access client and types
+- **Reasoning**: Standard Swift package architecture separates reusable library code from application code. This makes the Bluetooth client and data models available to other projects while keeping CLI-specific utilities in the executable target.
 
 ### 2025-11-20 14:30 (Documentation Cleanup)
 
