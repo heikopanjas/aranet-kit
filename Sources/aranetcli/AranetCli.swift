@@ -35,7 +35,7 @@ extension AranetReading {
         output += "\n"
 
         if let ago = ago, let interval = interval {
-            output += "Updated \(ago) s ago. Intervals: \(interval) s\n"
+            output += "Updated \(ago)s ago. Intervals: \(interval)s\n"
         }
 
         output += "---------------------------------------\n"
@@ -59,7 +59,7 @@ extension AranetReading {
                     output += "Status Display: \(status.name)\n"
                 }
                 if let ago = ago, let interval = interval {
-                    output += "Age:          \(ago)/\(interval) s\n"
+                    output += "Age:          \(ago)s/\(interval)s\n"
                 }
 
             case .aranet2:
@@ -71,7 +71,7 @@ extension AranetReading {
                 }
                 output += "Battery:      \(battery) %\n"
                 if let ago = ago, let interval = interval {
-                    output += "Age:          \(ago)/\(interval) s\n"
+                    output += "Age:          \(ago)s/\(interval)s\n"
                 }
 
             case .aranetRadiation:
@@ -99,7 +99,7 @@ extension AranetReading {
                 }
                 output += "Battery:      \(battery) %\n"
                 if let ago = ago, let interval = interval {
-                    output += "Age:          \(ago)/\(interval) s\n"
+                    output += "Age:          \(ago)s/\(interval)s\n"
                 }
 
             case .aranetRadon:
@@ -120,7 +120,7 @@ extension AranetReading {
                     output += "Status Display: \(status.name)\n"
                 }
                 if let ago = ago, let interval = interval {
-                    output += "Age:          \(ago)/\(interval) s\n"
+                    output += "Age:          \(ago)s/\(interval)s\n"
                 }
 
             case .unknown:
@@ -140,7 +140,7 @@ struct AranetCli: AsyncParsableCommand {
         commandName: "aranetcli",
         abstract: "Command-line tool for Aranet Bluetooth sensors",
         version: "1.0.0",
-        subcommands: [Scan.self, Read.self]
+        subcommands: [Scan.self, Read.self, Monitor.self]
     )
 }
 
@@ -267,6 +267,90 @@ extension AranetCli {
             catch let error as AranetError {
                 print("Error: \(error.description)")
                 throw ExitCode.failure
+            }
+        }
+    }
+}
+
+// MARK: - Monitor Command
+
+extension AranetCli {
+    struct Monitor: AsyncParsableCommand {
+        static let configuration = CommandConfiguration(
+            abstract: "Monitor sensor values from an Aranet device with periodic updates"
+        )
+
+        @Argument(help: "Device UUID or name")
+        var device: String
+
+        @Flag(name: .shortAndLong, help: "Show verbose output")
+        var verbose: Bool = false
+
+        mutating func run() async throws {
+            let scanSpinner = await ProgressSpinner(message: "Scanning for device '\(device)'...")
+
+            if verbose == false {
+                await scanSpinner.start()
+            }
+            else {
+                print("Scanning for device '\(device)'...")
+            }
+
+            let client = AranetClient()
+            client.verbose = verbose
+
+            do {
+                let devices = try await client.scan(timeout: 10.0)
+
+                guard
+                    let peripheral = devices.first(where: {
+                        $0.identifier.uuidString.lowercased() == device.lowercased()
+                            || $0.name?.lowercased().contains(device.lowercased()) == true
+                    })
+                else {
+                    if verbose == false {
+                        await scanSpinner.fail(message: "Device not found")
+                    }
+                    print("Error: Device not found")
+                    throw ExitCode.failure
+                }
+
+                if verbose == false {
+                    await scanSpinner.succeed(message: "Found \(peripheral.name ?? "device")")
+                }
+
+                print("\nMonitoring started. Press Ctrl+C to stop.\n")
+
+                // Use the monitoring stream from the library
+                let monitorStream = await client.monitor(from: peripheral)
+
+                for await result in monitorStream {
+                    switch result {
+                        case .success(let reading):
+                            print("\(Date())")
+                            print(reading.formatOutput())
+                            print()
+
+                        case .failure(let error):
+                            if let aranetError = error as? AranetError {
+                                print("Error: \(aranetError.description)")
+                            }
+                            else {
+                                print("Error: \(error.localizedDescription)")
+                            }
+                            throw ExitCode.failure
+                    }
+                }
+
+                print("Monitoring stopped.")
+            }
+            catch let error as AranetError {
+                print("Error: \(error.description)")
+                throw ExitCode.failure
+            }
+            catch is CancellationError {
+                print("\nMonitoring stopped.")
+                throw ExitCode.success
             }
         }
     }

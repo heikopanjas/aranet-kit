@@ -16,42 +16,96 @@ import Foundation
 
 // MARK: - Bluetooth UUIDs
 
+/// Bluetooth Low Energy service and characteristic UUIDs used by Aranet devices.
+///
+/// This structure contains all the standard and vendor-specific UUIDs required for
+/// communicating with Aranet sensors via Bluetooth LE. The UUIDs are organized by
+/// service type (GAP, DIS, SAF Tehnika) and their respective characteristics.
 public struct AranetUUID {
-    // GAP Service
+    // MARK: GAP Service
+
+    /// Generic Access Profile (GAP) service UUID.
     public static let serviceGAP = CBUUID(string: "1800")
+
+    /// Device name characteristic (GAP service).
     public static let characteristicDeviceName = CBUUID(string: "2A00")
 
-    // Device Information Service
+    // MARK: Device Information Service
+
+    /// Device Information Service (DIS) UUID.
     public static let serviceDIS = CBUUID(string: "180A")
+
+    /// Software/firmware revision string characteristic.
     public static let characteristicSoftwareRevision = CBUUID(string: "2A26")
+
+    /// Serial number string characteristic.
     public static let characteristicSerialNumber = CBUUID(string: "2A25")
 
-    // SAF Tehnika Service (Aranet)
+    // MARK: SAF Tehnika Service (Aranet)
+
+    /// Primary SAF Tehnika service UUID (Aranet-specific).
     public static let serviceSAFTehnika = CBUUID(string: "FCE0")
+
+    /// Legacy SAF Tehnika service UUID (older firmware versions).
     public static let serviceSAFTehnikaOld = CBUUID(string: "F0CD1400-95DA-4F4B-9AC8-AA55D312AF0C")
 
-    // SAF Tehnika Characteristics
+    // MARK: SAF Tehnika Characteristics
+
+    /// Basic current readings characteristic (requires pairing/authentication).
     public static let characteristicCurrentReadings = CBUUID(string: "F0CD1503-95DA-4F4B-9AC8-AA55D312AF0C")
+
+    /// Detailed current readings characteristic (no pairing required, preferred).
     public static let characteristicCurrentReadingsDetailed = CBUUID(string: "F0CD3001-95DA-4F4B-9AC8-AA55D312AF0C")
+
+    /// Aranet2 current readings characteristic.
     public static let characteristicCurrentReadingsAR2 = CBUUID(string: "F0CD1504-95DA-4F4B-9AC8-AA55D312AF0C")
+
+    /// Measurement interval characteristic (time between sensor updates).
     public static let characteristicInterval = CBUUID(string: "F0CD2002-95DA-4F4B-9AC8-AA55D312AF0C")
+
+    /// Seconds since last update characteristic (sensor data age).
     public static let characteristicSecondsSinceUpdate = CBUUID(string: "F0CD2004-95DA-4F4B-9AC8-AA55D312AF0C")
+
+    /// Total number of stored readings characteristic (history size).
     public static let characteristicTotalReadings = CBUUID(string: "F0CD2001-95DA-4F4B-9AC8-AA55D312AF0C")
 }
 
 // MARK: - Aranet Error
 
+/// Errors that can occur during Aranet device communication.
+///
+/// These errors represent various failure modes when scanning for, connecting to,
+/// or reading data from Aranet Bluetooth devices. Each error includes a descriptive
+/// message to help diagnose and resolve issues.
 public enum AranetError: Error {
+    /// Bluetooth is not available or not ready for use.
     case bluetoothUnavailable
+
+    /// Bluetooth access has not been authorized by the user.
     case bluetoothUnauthorized
+
+    /// Bluetooth Low Energy is not supported on this device.
     case bluetoothUnsupported
+
+    /// The requested Aranet device could not be found during scanning.
     case deviceNotFound
+
+    /// Failed to establish a connection to the device.
     case connectionFailed
+
+    /// Failed to read data from a Bluetooth characteristic.
     case readFailed
+
+    /// Received data that could not be parsed or is in an unexpected format.
     case invalidData
+
+    /// An operation exceeded its allowed time limit.
     case timeout
+
+    /// The device requires Bluetooth pairing before accessing encrypted characteristics.
     case pairingRequired
 
+    /// Human-readable description of the error with actionable guidance.
     public var description: String {
         switch self {
             case .bluetoothUnavailable:
@@ -91,6 +145,34 @@ public enum AranetError: Error {
 
 // MARK: - Aranet Client
 
+/// Bluetooth Low Energy client for communicating with Aranet sensor devices.
+///
+/// `AranetClient` provides a high-level async/await API for discovering, connecting to,
+/// and reading data from Aranet Bluetooth sensors (Aranet4, Aranet2, Aranet Radiation,
+/// and Aranet Radon Plus). The client handles CoreBluetooth complexity internally and
+/// presents a clean Swift concurrency interface.
+///
+/// The client runs on the main actor to satisfy CoreBluetooth's threading requirements.
+/// All public methods are safe to call from any context and will automatically dispatch
+/// to the main actor as needed.
+///
+/// Example usage:
+/// ```swift
+/// let client = AranetClient()
+/// client.verbose = true  // Enable debug logging
+///
+/// // Scan for devices
+/// let devices = try await client.scan(timeout: 5.0)
+///
+/// // Read current sensor values
+/// if let device = devices.first {
+///     let reading = try await client.readCurrentReadings(from: device)
+///     print("CO2: \\(reading.co2 ?? 0) ppm")
+/// }
+/// ```
+///
+/// - Note: This class uses `@unchecked Sendable` because CoreBluetooth types are not
+///   Sendable, but the implementation ensures thread-safe access through main actor isolation.
 public class AranetClient: NSObject, @unchecked Sendable {
     private var centralManager: CBCentralManager!
     private var peripheral: CBPeripheral?
@@ -110,6 +192,13 @@ public class AranetClient: NSObject, @unchecked Sendable {
     // Track which reading characteristics are available
     private var availableReadingChars: Set<CBUUID> = []
 
+    /// Enables verbose debug logging to console.
+    ///
+    /// When set to `true`, the client will print detailed information about Bluetooth
+    /// operations including scanning, connection status, service discovery, and data reads.
+    /// Useful for troubleshooting connection issues or understanding device behavior.
+    ///
+    /// Default is `false`.
     public var verbose: Bool = false
 
     public override init() {
@@ -159,6 +248,29 @@ public class AranetClient: NSObject, @unchecked Sendable {
         }
     }
 
+    /// Scans for nearby Aranet Bluetooth devices.
+    ///
+    /// Performs a Bluetooth Low Energy scan looking for Aranet devices advertising their
+    /// service UUIDs. The scan automatically stops after the specified timeout period.
+    ///
+    /// - Parameter timeout: Maximum time to scan in seconds. Default is 5.0 seconds.
+    ///
+    /// - Returns: Array of discovered `CBPeripheral` objects representing Aranet devices.
+    ///   The array may be empty if no devices are found within the timeout period.
+    ///
+    /// - Throws: `AranetError` if Bluetooth is unavailable or unauthorized.
+    ///
+    /// - Note: Devices must be powered on and within Bluetooth range to be discovered.
+    ///   The scan looks for both current and legacy Aranet service UUIDs.
+    ///
+    /// Example:
+    /// ```swift
+    /// let client = AranetClient()
+    /// let devices = try await client.scan(timeout: 10.0)
+    /// for device in devices {
+    ///     print("Found: \\(device.name ?? "Unknown")")
+    /// }
+    /// ```
     public func scan(timeout: TimeInterval = 5.0) async throws -> [CBPeripheral] {
         try await waitForBluetoothReady()
 
@@ -185,6 +297,41 @@ public class AranetClient: NSObject, @unchecked Sendable {
         }
     }
 
+    /// Reads current sensor measurements from an Aranet device.
+    ///
+    /// Connects to the specified device (if not already connected), discovers its services
+    /// and characteristics, then reads the current sensor data. The method automatically
+    /// selects the best available reading characteristic based on device capabilities.
+    ///
+    /// For Aranet4 and similar devices, the detailed characteristic (F0CD3001) is preferred
+    /// as it provides complete sensor data without requiring Bluetooth pairing.
+    ///
+    /// - Parameter peripheral: The `CBPeripheral` to read from, typically obtained from `scan()`.
+    ///
+    /// - Returns: An `AranetReading` struct containing all available sensor measurements,
+    ///   device information, and metadata (battery, interval, age, etc.).
+    ///
+    /// - Throws: `AranetError` for various failure conditions:
+    ///   - `.connectionFailed`: Could not connect to the device
+    ///   - `.readFailed`: Could not read characteristic data
+    ///   - `.invalidData`: Received data could not be parsed
+    ///   - `.timeout`: Operation took too long (30 second timeout)
+    ///   - `.pairingRequired`: Device requires pairing (rare, only for encrypted characteristics)
+    ///
+    /// - Note: The method includes a 30-second timeout. If the operation takes longer,
+    ///   it will throw `.timeout`. The device connection is automatically closed after reading.
+    ///
+    /// Example:
+    /// ```swift
+    /// let client = AranetClient()
+    /// let devices = try await client.scan()
+    /// if let device = devices.first {
+    ///     let reading = try await client.readCurrentReadings(from: device)
+    ///     print("CO2: \\(reading.co2 ?? 0) ppm")
+    ///     print("Temperature: \\(reading.temperature ?? 0) °C")
+    ///     print("Battery: \\(reading.battery)%")
+    /// }
+    /// ```
     public func readCurrentReadings(from peripheral: CBPeripheral) async throws -> AranetReading {
         try await waitForBluetoothReady()
 
@@ -258,7 +405,153 @@ public class AranetClient: NSObject, @unchecked Sendable {
         }
     }
 
-    public func disconnect() {
+    /// Monitors an Aranet device with periodic automatic updates.
+    ///
+    /// This method performs an initial reading to determine the device's measurement interval,
+    /// then schedules subsequent readings to occur 3 seconds after each expected sensor update.
+    /// The timing is adaptive and uses the device's reported interval and age for accurate synchronization.
+    ///
+    /// - Parameters:
+    ///   - peripheral: The connected peripheral to monitor
+    ///
+    /// - Returns: An async stream of sensor readings
+    ///
+    /// - Note: The stream will continue indefinitely until the task is cancelled or an error occurs.
+    ///         Use a `for await` loop to consume the readings.
+    ///
+    /// Example:
+    /// ```swift
+    /// let stream = client.monitor(from: peripheral)
+    /// for await result in stream {
+    ///     switch result {
+    ///     case .success(let reading):
+    ///         print(reading.formatOutput())
+    ///     case .failure(let error):
+    ///         print("Error: \\(error)")
+    ///     }
+    /// }
+    /// ```
+    @MainActor
+    public func monitor(from peripheral: CBPeripheral) -> AsyncStream<Result<AranetReading, Error>> {
+        return AsyncStream { continuation in
+            Task { @MainActor [weak self] in
+                guard let self = self else {
+                    continuation.finish()
+                    return
+                }
+
+                do {
+                    // Initial reading
+                    if self.verbose == true {
+                        print("[DEBUG] Performing initial reading for monitoring setup...")
+                    }
+
+                    let initialReading = try await self.readCurrentReadings(from: peripheral)
+                    continuation.yield(.success(initialReading))
+
+                    // Check if we have interval information
+                    guard let interval = initialReading.interval, let ago = initialReading.ago else {
+                        continuation.yield(.failure(AranetError.invalidData))
+                        continuation.finish()
+                        return
+                    }
+
+                    // Calculate next update time - wait until next sensor update + 3s
+                    let timeUntilNextUpdate = Int(interval) - Int(ago)
+                    let firstReadDelay = timeUntilNextUpdate + 3
+
+                    if self.verbose == true {
+                        print("[DEBUG] Device interval: \(interval)s, ago: \(ago)s")
+                        print("[DEBUG] Time until next sensor update: \(timeUntilNextUpdate)s")
+                        print("[DEBUG] First reading in \(firstReadDelay) seconds...")
+                    }
+
+                    // Continue monitoring with recursive reads
+                    await self.monitoringLoop(
+                        from: peripheral,
+                        interval: TimeInterval(interval),
+                        initialDelay: TimeInterval(firstReadDelay),
+                        continuation: continuation
+                    )
+                }
+                catch {
+                    if self.verbose == true {
+                        print("[DEBUG] Initial monitoring read failed: \(error)")
+                    }
+                    continuation.yield(.failure(error))
+                    continuation.finish()
+                }
+            }
+        }
+    }
+
+    /// Internal monitoring loop that schedules periodic reads
+    @MainActor
+    private func monitoringLoop(
+        from peripheral: CBPeripheral,
+        interval: TimeInterval,
+        initialDelay: TimeInterval,
+        continuation: AsyncStream<Result<AranetReading, Error>>.Continuation
+    ) async {
+        var currentDelay = initialDelay
+        let baseInterval = interval
+
+        while Task.isCancelled == false {
+            // Wait for the specified interval using Timer on main actor
+            await withCheckedContinuation { (timerContinuation: CheckedContinuation<Void, Never>) in
+                Timer.scheduledTimer(withTimeInterval: currentDelay, repeats: false) { _ in
+                    timerContinuation.resume()
+                }
+            }
+
+            // Check cancellation after timer
+            if Task.isCancelled == true {
+                continuation.finish()
+                return
+            }
+
+            do {
+                if self.verbose == true {
+                    print("[DEBUG] Reading sensor data...")
+                }
+
+                let reading = try await self.readCurrentReadings(from: peripheral)
+                continuation.yield(.success(reading))
+
+                // Calculate next delay: wait for one full interval from now, plus 3 seconds
+                // This ensures we read 3 seconds after the next sensor update
+                if let ago = reading.ago {
+                    // Time until next sensor update
+                    let timeUntilNextUpdate = baseInterval - TimeInterval(ago)
+                    currentDelay = timeUntilNextUpdate + 3.0
+
+                    if self.verbose == true {
+                        print("[DEBUG] Sensor age: \(ago)s, next update in \(Int(timeUntilNextUpdate))s")
+                        print("[DEBUG] Next reading in \(Int(currentDelay)) seconds...")
+                    }
+                }
+                else {
+                    // Fallback: use base interval + 3 seconds
+                    currentDelay = baseInterval + 3.0
+                    if self.verbose == true {
+                        print("[DEBUG] Age not available, using base interval + 3s")
+                    }
+                }
+            }
+            catch {
+                if self.verbose == true {
+                    print("[DEBUG] Monitoring read error: \(error)")
+                }
+                continuation.yield(.failure(error))
+                continuation.finish()
+                return
+            }
+        }
+
+        continuation.finish()
+    }
+
+    private func disconnect() {
         if let peripheral = peripheral {
             centralManager.cancelPeripheralConnection(peripheral)
         }

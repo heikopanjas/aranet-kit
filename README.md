@@ -91,6 +91,61 @@ Age:          237/300 s
 ---------------------------------------
 ```
 
+### Monitor sensor values
+
+Continuously monitor a device with automatic periodic updates:
+
+```bash
+# Monitor by device name
+swift run aranetcli monitor "Aranet4"
+
+# Monitor with verbose output
+swift run aranetcli monitor "Aranet4" --verbose
+```
+
+The monitor command:
+
+- Performs an initial reading to get device interval and timing
+- Calculates when the next sensor update will occur
+- Schedules readings 3 seconds after each sensor update
+- Continues monitoring until interrupted (Ctrl+C)
+
+Example output:
+
+```text
+Scanning for device 'Aranet4'...
+Connecting to Aranet4 228EB...
+---------------------------------------
+Connected: Aranet4 228EB | v1.4.19
+Updated 237 s ago. Intervals: 300 s
+---------------------------------------
+CO2:          1369 ppm
+Temperature:  24.1 °C
+Humidity:     44 %
+Pressure:     1008.5 hPa
+Battery:      94 %
+Status Display: YELLOW
+Age:          237/300 s
+---------------------------------------
+
+Monitoring started. Press Ctrl+C to stop.
+Next reading in approximately 78 seconds...
+
+2025-11-22 20:30:45
+---------------------------------------
+Connected: Aranet4 228EB | v1.4.19
+Updated 15 s ago. Intervals: 300 s
+---------------------------------------
+CO2:          1365 ppm
+Temperature:  24.2 °C
+Humidity:     43 %
+Pressure:     1008.6 hPa
+Battery:      94 %
+Status Display: YELLOW
+Age:          15/300 s
+---------------------------------------
+```
+
 ## Technical Details
 
 ### No Pairing Required

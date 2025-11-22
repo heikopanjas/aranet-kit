@@ -1,6 +1,6 @@
 # Project Instructions for AI Coding Agents
 
-**Last updated:** 2025-11-22 20:05
+**Last updated:** 2025-11-22 21:00
 
 <!-- {mission} -->
 
@@ -11,6 +11,7 @@
 Key features:
 
 - Read current sensor measurements (CO2, temperature, humidity, pressure)
+- Monitor sensor values with periodic automatic updates
 - Fetch and export historical data logs
 - Configure device settings (update intervals, integrations, Bluetooth range)
 - Scan for nearby Aranet devices
@@ -569,6 +570,72 @@ After making ANY code changes:
 ---
 
 ## Recent Updates & Decisions
+
+### 2025-11-22 21:00 (Comprehensive API Documentation)
+
+- **Added DocC-style documentation**: Comprehensive documentation added to all public APIs in AranetClient.swift
+- **Documented types**:
+  - `AranetUUID` struct with all Bluetooth service and characteristic UUIDs
+  - `AranetError` enum with detailed error descriptions
+  - `AranetClient` class with usage examples
+  - `verbose` property
+  - `scan(timeout:)` method
+  - `readCurrentReadings(from:)` method
+  - `monitor(from:)` method (already documented)
+- **Documentation style**:
+  - Clear, concise descriptions of purpose and behavior
+  - Parameter documentation with types and constraints
+  - Return value descriptions
+  - Error cases with specific conditions
+  - Usage examples with code snippets
+  - Important notes and caveats
+- **Benefits**:
+  - Better IDE autocomplete and inline help
+  - Easier for other developers to use the library
+  - Self-documenting code reduces need for external docs
+  - Follows Swift DocC conventions for documentation generation
+- **Reasoning**: Comprehensive documentation makes the library more accessible and professional. Following Apple's DocC style ensures compatibility with Swift documentation tools and provides excellent IDE integration.
+
+### 2025-11-22 20:45 (Monitor Refactoring - Library API)
+
+- **Refactored monitoring logic**: Moved from CLI to AranetKit library as reusable API
+- **New library method**: `AranetClient.monitor(from:) -> AsyncStream<Result<AranetReading, Error>>`
+- **Timer-based scheduling**: Replaced Task.sleep with proper Timer implementation
+- **AsyncStream pattern**: Returns Result-wrapped readings for clean error handling
+- **Accurate timing**: Uses device interval and ago values to schedule reads 3 seconds after each sensor update
+- **No drift**: Recalculates delay based on actual sensor age, not accumulated time
+- **Implementation details**:
+  - `@MainActor` isolation for CoreBluetooth compatibility
+  - Internal `monitoringLoop` method with CheckedContinuation wrapping Timer
+  - Proper cancellation handling via Task.isCancelled checks
+  - Adaptive interval scheduling based on device-reported intervals and age
+- **CLI simplification**: Monitor command now simply iterates over the stream
+- **Benefits**:
+  - Monitoring logic reusable by other Swift projects importing AranetKit
+  - Cleaner separation of concerns
+  - Timer provides more accurate scheduling than Task.sleep
+  - AsyncStream enables easy consumption via for-await loops
+  - Eliminates timing drift by recalculating based on sensor age
+- **Reasoning**: Library-level monitoring API enables broader reuse and follows Swift best practices for async sequences. Timer-based approach provides more reliable periodic execution on MainActor compared to Task.sleep. Using sensor age for scheduling prevents drift accumulation.
+
+### 2025-11-22 20:30 (Monitor Command Implementation)
+
+- **Added monitor command**: New CLI subcommand for continuous sensor monitoring
+- **Implementation**: `AranetCli.swift` - Monitor struct with AsyncParsableCommand
+- **Features**:
+  - Initial sensor reading with device scan and connection
+  - Smart scheduling based on device interval and ago values
+  - Calculates next sensor update time and schedules first reading 15 seconds after
+  - Continuous monitoring loop with periodic readings at interval + 15 seconds
+  - Graceful cancellation handling (Ctrl+C)
+  - Verbose mode support for debugging
+- **Usage**: `aranetcli monitor <device> [--verbose]`
+- **Technical details**:
+  - Uses async/await with Task.sleep for scheduling
+  - Handles CancellationError for clean exit
+  - Displays timestamp with each reading
+  - Adapts to device-reported intervals for subsequent readings
+- **Reasoning**: Enables real-time monitoring of Aranet sensors without manual polling. The 15-second delay after expected updates ensures fresh data is available when reading. Smart scheduling uses device's own timing information for accurate synchronization.
 
 ### 2025-11-22 19:15 (Single Guard Statements)
 
