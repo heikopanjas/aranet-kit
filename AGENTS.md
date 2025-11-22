@@ -1,6 +1,6 @@
 # Project Instructions for AI Coding Agents
 
-**Last updated:** 2025-11-22 18:45
+**Last updated:** 2025-11-22 19:00
 
 <!-- {mission} -->
 
@@ -613,6 +613,38 @@ public func updateLocation(location: Location) {
 
 ## Control Flow
 
+### Boolean Comparisons
+
+**ALWAYS use explicit comparisons with boolean values.**
+
+```swift
+// CORRECT: Explicit boolean comparisons
+if verbose == true {
+    print("Debug mode enabled")
+}
+
+if isEnabled == false {
+    return
+}
+
+while isRunning == true {
+    process()
+}
+
+// INCORRECT: Implicit boolean checks
+if verbose {  // Wrong - not explicit
+    print("Debug mode enabled")
+}
+
+if !isEnabled {  // Wrong - not explicit
+    return
+}
+
+while isRunning {  // Wrong - not explicit
+    process()
+}
+```
+
 ### If Statements
 
 ```swift
@@ -631,7 +663,7 @@ guard let location = self.location else {
     return
 }
 
-// CORRECT: Multiple conditions
+// CORRECT: Multiple conditions with explicit boolean check
 if needsUpdate == true {
     self.location = location
     if let delegate = self.delegate {
@@ -1755,6 +1787,18 @@ After making ANY code changes:
 ---
 
 ## Recent Updates & Decisions
+
+### 2025-11-22 19:00 (Explicit Boolean Comparisons)
+
+- **Added coding standard**: Require explicit boolean comparisons in all control flow statements
+- **Rule**: Always use `if condition == true` instead of `if condition`, and `if condition == false` instead of `if !condition`
+- **Implementation**: Updated all `if` and `while` statements throughout codebase to use explicit comparisons
+- **Files updated**: `AranetClient.swift`, `aranetctl.swift`
+- **Benefits**:
+  - Improved code readability
+  - Makes boolean comparisons explicit and unambiguous
+  - Consistent style across the codebase
+- **Reasoning**: Explicit boolean comparisons make code intent clearer and are easier to understand, especially for developers coming from languages where truthiness differs from Swift.
 
 ### 2025-11-22 18:45 (Library Package Architecture)
 

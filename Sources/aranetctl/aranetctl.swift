@@ -35,7 +35,7 @@ extension AranetCTL {
         mutating func run() async throws {
             let spinner = await ProgressSpinner(message: "Scanning for Aranet devices...")
 
-            if !verbose {
+            if verbose == false {
                 await spinner.start()
             }
             else {
@@ -47,7 +47,7 @@ extension AranetCTL {
                 client.verbose = verbose
                 let devices = try await client.scan(timeout: timeout)
 
-                if !verbose {
+                if verbose == false {
                     await spinner.stop()
                 }
 
@@ -62,7 +62,7 @@ extension AranetCTL {
                 }
             }
             catch let error as AranetError {
-                if !verbose {
+                if verbose == false {
                     await spinner.fail(message: "Scan failed")
                 }
                 print("Error: \(error.description)")
@@ -89,7 +89,7 @@ extension AranetCTL {
         mutating func run() async throws {
             let scanSpinner = await ProgressSpinner(message: "Scanning for device '\(device)'...")
 
-            if !verbose {
+            if verbose == false {
                 await scanSpinner.start()
             }
             else {
@@ -107,32 +107,32 @@ extension AranetCTL {
                             || $0.name?.lowercased().contains(device.lowercased()) == true
                     })
                 else {
-                    if !verbose {
+                    if verbose == false {
                         await scanSpinner.fail(message: "Device not found")
                     }
                     print("Error: Device not found")
                     throw ExitCode.failure
                 }
 
-                if !verbose {
+                if verbose == false {
                     await scanSpinner.succeed(message: "Found \(peripheral.name ?? "device")")
                 }
 
                 let connectSpinner = await ProgressSpinner(message: "Connecting to \(peripheral.name ?? "device")...")
-                if !verbose {
+                if verbose == false {
                     await connectSpinner.start()
                 }
                 else {
                     print("Connecting to \(peripheral.name ?? "device")...")
                 }
 
-                if verbose {
+                if verbose == true {
                     print("[DEBUG] Starting read operation...")
                 }
 
                 let reading = try await client.readCurrentReadings(from: peripheral)
 
-                if !verbose {
+                if verbose == false {
                     await connectSpinner.succeed(message: "Connected to \(peripheral.name ?? "device")")
                 }
 

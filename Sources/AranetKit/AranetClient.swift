@@ -107,25 +107,25 @@ public class AranetClient: NSObject, @unchecked Sendable {
     // MARK: - Public Methods
 
     private func waitForBluetoothReady() async throws {
-        if verbose {
+        if verbose == true {
             print("[DEBUG] Checking Bluetooth state: \(centralManager.state.rawValue)")
         }
 
         if centralManager.state == .poweredOn {
-            if verbose {
+            if verbose == true {
                 print("[DEBUG] Bluetooth already powered on")
             }
             return
         }
 
         if centralManager.state != .unknown && centralManager.state != .resetting {
-            if verbose {
+            if verbose == true {
                 print("[DEBUG] Bluetooth state invalid: \(centralManager.state.rawValue)")
             }
             throw AranetError.bluetoothUnavailable
         }
 
-        if verbose {
+        if verbose == true {
             print("[DEBUG] Waiting for Bluetooth to power on...")
         }
 
@@ -136,7 +136,7 @@ public class AranetClient: NSObject, @unchecked Sendable {
                 guard let self = self else { return }
                 try? await Task.sleep(nanoseconds: 5_000_000_000)
                 if self.bluetoothReadyContinuation != nil {
-                    if self.verbose {
+                    if self.verbose == true {
                         print("[DEBUG] Bluetooth ready timeout")
                     }
                     self.bluetoothReadyContinuation?.resume(throwing: AranetError.bluetoothUnavailable)
@@ -188,7 +188,7 @@ public class AranetClient: NSObject, @unchecked Sendable {
         self.peripheral = peripheral
         peripheral.delegate = self
 
-        if verbose {
+        if verbose == true {
             print("[DEBUG] Starting read from device: \(peripheral.name ?? "Unknown") (\(peripheral.identifier))")
             print("[DEBUG] Current connection state: \(peripheral.state.rawValue)")
         }
@@ -199,7 +199,7 @@ public class AranetClient: NSObject, @unchecked Sendable {
             self.continuation = continuation
 
             if peripheral.state != .connected {
-                if verbose {
+                if verbose == true {
                     print("[DEBUG] Connecting to peripheral...")
                 }
                 // Request pairing/bonding by specifying notification options
@@ -210,7 +210,7 @@ public class AranetClient: NSObject, @unchecked Sendable {
                 centralManager.connect(peripheral, options: options)
             }
             else {
-                if verbose {
+                if verbose == true {
                     print("[DEBUG] Already connected, discovering services...")
                 }
                 peripheral.discoverServices(nil)  // Discover ALL services
@@ -222,7 +222,7 @@ public class AranetClient: NSObject, @unchecked Sendable {
                 // Check for encryption errors after a short delay
                 try? await Task.sleep(nanoseconds: 5_000_000_000)
                 if self.continuation != nil && self.encryptionErrors > 0 && self.readingData == nil {
-                    if self.verbose {
+                    if self.verbose == true {
                         print("[DEBUG] Detected encryption errors with no data - pairing required")
                     }
                     self.continuation?.resume(throwing: AranetError.pairingRequired)
@@ -234,7 +234,7 @@ public class AranetClient: NSObject, @unchecked Sendable {
                 // Final timeout after 30 seconds
                 try? await Task.sleep(nanoseconds: 25_000_000_000)
                 if self.continuation != nil {
-                    if self.verbose {
+                    if self.verbose == true {
                         print("[DEBUG] Operation timed out after 30 seconds")
                     }
                     self.continuation?.resume(throwing: AranetError.timeout)
@@ -291,7 +291,7 @@ extension AranetClient: CBCentralManagerDelegate {
     }
 
     public func centralManager(_ central: CBCentralManager, didConnect peripheral: CBPeripheral) {
-        if verbose {
+        if verbose == true {
             print("[DEBUG] Connected to peripheral: \(peripheral.name ?? "Unknown")")
             print("[DEBUG] Discovering services...")
         }
@@ -299,7 +299,7 @@ extension AranetClient: CBCentralManagerDelegate {
     }
 
     public func centralManager(_ central: CBCentralManager, didFailToConnect peripheral: CBPeripheral, error: Error?) {
-        if verbose {
+        if verbose == true {
             print("[DEBUG] Failed to connect: \(error?.localizedDescription ?? "unknown error")")
         }
         continuation?.resume(throwing: error ?? AranetError.connectionFailed)
@@ -307,7 +307,7 @@ extension AranetClient: CBCentralManagerDelegate {
     }
 
     public func centralManager(_ central: CBCentralManager, didDisconnectPeripheral peripheral: CBPeripheral, error: Error?) {
-        if verbose {
+        if verbose == true {
             print("[DEBUG] Disconnected from peripheral: \(error?.localizedDescription ?? "clean disconnect")")
         }
         self.peripheral = nil
@@ -318,12 +318,12 @@ extension AranetClient: CBCentralManagerDelegate {
 
 extension AranetClient: CBPeripheralDelegate {
     public func peripheral(_ peripheral: CBPeripheral, didDiscoverServices error: Error?) {
-        if verbose {
+        if verbose == true {
             print("[DEBUG] Discovered services: \(peripheral.services?.count ?? 0)")
         }
 
         guard error == nil, let services = peripheral.services else {
-            if verbose {
+            if verbose == true {
                 print("[DEBUG] Error discovering services: \(error?.localizedDescription ?? "unknown")")
             }
             continuation?.resume(throwing: error ?? AranetError.readFailed)
@@ -334,7 +334,7 @@ extension AranetClient: CBPeripheralDelegate {
         expectedServices = services.count
 
         for service in services {
-            if verbose {
+            if verbose == true {
                 print("[DEBUG] Discovering characteristics for service: \(service.uuid)")
             }
             peripheral.discoverCharacteristics(nil, for: service)
@@ -344,51 +344,51 @@ extension AranetClient: CBPeripheralDelegate {
     public func peripheral(_ peripheral: CBPeripheral, didDiscoverCharacteristicsFor service: CBService, error: Error?) {
         servicesDiscovered += 1
 
-        if verbose {
+        if verbose == true {
             print("[DEBUG] Discovered \(service.characteristics?.count ?? 0) characteristics for service: \(service.uuid)")
             print("[DEBUG] Services discovered: \(servicesDiscovered)/\(expectedServices)")
         }
 
         guard error == nil, let characteristics = service.characteristics else {
-            if verbose {
+            if verbose == true {
                 print("[DEBUG] Error discovering characteristics: \(error?.localizedDescription ?? "unknown")")
             }
             return
         }
 
         for characteristic in characteristics {
-            if verbose {
+            if verbose == true {
                 print("[DEBUG] Found characteristic: \(characteristic.uuid) (properties: \(characteristic.properties.rawValue))")
             }
 
             if characteristic.uuid == AranetUUID.characteristicDeviceName {
-                if verbose {
+                if verbose == true {
                     print("[DEBUG] Reading device name...")
                 }
                 pendingReads.insert(characteristic.uuid)
                 peripheral.readValue(for: characteristic)
             }
             else if characteristic.uuid == AranetUUID.characteristicSoftwareRevision {
-                if verbose {
+                if verbose == true {
                     print("[DEBUG] Reading software revision...")
                 }
                 pendingReads.insert(characteristic.uuid)
                 peripheral.readValue(for: characteristic)
             }
             else if characteristic.uuid == AranetUUID.characteristicCurrentReadingsDetailed {
-                if verbose {
+                if verbose == true {
                     print("[DEBUG] Found detailed current readings characteristic")
                 }
                 availableReadingChars.insert(characteristic.uuid)
             }
             else if characteristic.uuid == AranetUUID.characteristicCurrentReadings {
-                if verbose {
+                if verbose == true {
                     print("[DEBUG] Found basic current readings characteristic")
                 }
                 availableReadingChars.insert(characteristic.uuid)
             }
             else if characteristic.uuid == AranetUUID.characteristicCurrentReadingsAR2 {
-                if verbose {
+                if verbose == true {
                     print("[DEBUG] Found AR2 current readings characteristic")
                 }
                 availableReadingChars.insert(characteristic.uuid)
@@ -397,7 +397,7 @@ extension AranetClient: CBPeripheralDelegate {
 
         // Only check if we've discovered all services
         if servicesDiscovered == expectedServices {
-            if verbose {
+            if verbose == true {
                 print("[DEBUG] All services discovered. Available reading characteristics: \(availableReadingChars.count)")
             }
 
@@ -407,19 +407,19 @@ extension AranetClient: CBPeripheralDelegate {
             // Priority: Detailed > AR2 > Basic
             if availableReadingChars.contains(AranetUUID.characteristicCurrentReadingsDetailed) {
                 readingCharToRead = AranetUUID.characteristicCurrentReadingsDetailed
-                if verbose {
+                if verbose == true {
                     print("[DEBUG] Will read detailed current readings (F0CD3001)")
                 }
             }
             else if availableReadingChars.contains(AranetUUID.characteristicCurrentReadingsAR2) {
                 readingCharToRead = AranetUUID.characteristicCurrentReadingsAR2
-                if verbose {
+                if verbose == true {
                     print("[DEBUG] Will read AR2 current readings (F0CD1504)")
                 }
             }
             else if availableReadingChars.contains(AranetUUID.characteristicCurrentReadings) {
                 readingCharToRead = AranetUUID.characteristicCurrentReadings
-                if verbose {
+                if verbose == true {
                     print("[DEBUG] Will read basic current readings (F0CD1503)")
                 }
             }
@@ -433,7 +433,7 @@ extension AranetClient: CBPeripheralDelegate {
                             if char.uuid == readingChar {
                                 pendingReads.insert(char.uuid)
                                 peripheral.readValue(for: char)
-                                if verbose {
+                                if verbose == true {
                                     print("[DEBUG] Reading from \(char.uuid)")
                                 }
                             }
@@ -442,19 +442,19 @@ extension AranetClient: CBPeripheralDelegate {
                 }
             }
 
-            if verbose {
+            if verbose == true {
                 print("[DEBUG] Pending reads: \(pendingReads.count)")
             }
 
             // If we have reading data but no more mandatory reads, complete
             if readingData != nil && pendingReads.isEmpty {
-                if verbose {
+                if verbose == true {
                     print("[DEBUG] Have reading data and no pending reads, completing...")
                 }
                 completeReading()
             }
             else if pendingReads.isEmpty {
-                if verbose {
+                if verbose == true {
                     print("[DEBUG] All services discovered but no reading characteristics found!")
                 }
                 continuation?.resume(throwing: AranetError.readFailed)
@@ -470,7 +470,7 @@ extension AranetClient: CBPeripheralDelegate {
 
             // Check if this is an authentication error (code 15 = insufficient encryption/authentication)
             if nsError.domain == "CBATTErrorDomain" && nsError.code == 15 {
-                if verbose {
+                if verbose == true {
                     print(
                         "[DEBUG] Authentication error on characteristic \(characteristic.uuid) - this is expected for F0CD1503, we use F0CD3001 instead"
                     )
@@ -483,7 +483,7 @@ extension AranetClient: CBPeripheralDelegate {
             }
 
             // Other errors
-            if verbose {
+            if verbose == true {
                 print("[DEBUG] Error reading characteristic \(characteristic.uuid): \(error.localizedDescription)")
             }
             pendingReads.remove(characteristic.uuid)
@@ -491,7 +491,7 @@ extension AranetClient: CBPeripheralDelegate {
         }
 
         guard let data = characteristic.value else {
-            if verbose {
+            if verbose == true {
                 print("[DEBUG] ⚠️ No data returned for characteristic \(characteristic.uuid) - this may indicate pairing required")
             }
             pendingReads.remove(characteristic.uuid)
@@ -502,14 +502,14 @@ extension AranetClient: CBPeripheralDelegate {
                 || characteristic.uuid == AranetUUID.characteristicCurrentReadingsAR2
             {
                 encryptionErrors += 1
-                if verbose {
+                if verbose == true {
                     print("[DEBUG] ⚠️ Reading characteristic returned no data - likely needs pairing (count: \(encryptionErrors))")
                 }
             }
             return
         }
 
-        if verbose {
+        if verbose == true {
             print("[DEBUG] Read characteristic \(characteristic.uuid): \(data.count) bytes")
         }
 
@@ -517,13 +517,13 @@ extension AranetClient: CBPeripheralDelegate {
 
         if characteristic.uuid == AranetUUID.characteristicDeviceName {
             deviceName = String(data: data, encoding: .utf8) ?? ""
-            if verbose {
+            if verbose == true {
                 print("[DEBUG] Device name: \(deviceName)")
             }
         }
         else if characteristic.uuid == AranetUUID.characteristicSoftwareRevision {
             deviceVersion = String(data: data, encoding: .utf8) ?? ""
-            if verbose {
+            if verbose == true {
                 print("[DEBUG] Software version: \(deviceVersion)")
             }
         }
@@ -532,17 +532,17 @@ extension AranetClient: CBPeripheralDelegate {
             || characteristic.uuid == AranetUUID.characteristicCurrentReadingsAR2
         {
             readingData = data
-            if verbose {
+            if verbose == true {
                 print("[DEBUG] Got reading data: \(data.map { String(format: "%02X", $0) }.joined(separator: " "))")
             }
         }
 
-        if verbose {
+        if verbose == true {
             print("[DEBUG] Pending reads remaining: \(pendingReads.count)")
         }
 
         if pendingReads.isEmpty && readingData != nil {
-            if verbose {
+            if verbose == true {
                 print("[DEBUG] All reads complete, parsing data...")
             }
             completeReading()
@@ -551,13 +551,13 @@ extension AranetClient: CBPeripheralDelegate {
 
     // Add delegate methods for pairing/authentication monitoring
     public func peripheral(_ peripheral: CBPeripheral, didModifyServices invalidatedServices: [CBService]) {
-        if verbose {
+        if verbose == true {
             print("[DEBUG] Peripheral services were modified")
         }
     }
 
     public func peripheralIsReady(toSendWriteWithoutResponse peripheral: CBPeripheral) {
-        if verbose {
+        if verbose == true {
             print("[DEBUG] Peripheral ready to send write without response")
         }
     }
