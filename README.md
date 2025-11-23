@@ -1,4 +1,4 @@
-# aranetcli
+# AranetKit & CLI
 
 A Swift command-line tool for interacting with Aranet Bluetooth sensors (Aranet4, Aranet2, Aranet Radiation, Aranet Radon Plus).
 
