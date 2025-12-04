@@ -1,9 +1,86 @@
-.DS_Store
-/.build
-/Packages
+# Swift .gitignore
+# Covers both macOS and Linux platforms
+
+# Swift Package Manager
+.build/
+.swiftpm/
+Package.resolved
+*.xcodeproj
+
+# Xcode
 xcuserdata/
+*.xcscmblueprint
+*.xccheckout
 DerivedData/
-.swiftpm/configuration/registries.json
-.swiftpm/xcode/package.xcworkspace/contents.xcworkspacedata
-.netrc
+*.moved-aside
+*.pbxuser
+!default.pbxuser
+*.mode1v3
+!default.mode1v3
+*.mode2v3
+!default.mode2v3
+*.perspectivev3
+!default.perspectivev3
+*.hmap
+*.ipa
+*.dSYM.zip
+*.dSYM
+
+# Swift compiled files
+*.swiftmodule
+*.swiftdoc
+*.swiftsourceinfo
+
+# Playgrounds
+timeline.xctimeline
+playground.xcworkspace
+
+# Swift intermediate files
+*.swiftinterface
+*.abi.json
+
+# CocoaPods
+Pods/
+Podfile.lock
+
+# Carthage
+Carthage/
+Cartfile.resolved
+
+# fastlane
+fastlane/report.xml
+fastlane/Preview.html
+fastlane/screenshots/**/*.png
+fastlane/test_output
+
+# Code coverage
+*.gcda
+*.gcno
+*.profdata
+
+# IDEs and editors
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.*.swp
+
+# OS-specific files
+.DS_Store
+Thumbs.db
+Desktop.ini
+
+# AppCode
+.idea/
+
+# VS Code
+.vscode/
+
+# Build artifacts
+build/
+Build/
+
+# Python code
 python-impl/
+
