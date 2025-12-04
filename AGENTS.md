@@ -348,11 +348,11 @@ Byte 8:      Status (UInt8) - status color/alert (0=Error, 1=Green, 2=Yellow, 3=
 
 ### Aranet2 Device Format
 
-#### F0CD1504 - Current Readings (8 bytes)
+#### F0CD1504 - Current Readings (10 bytes)
 
 **Characteristic UUID:** `F0CD1504-95DA-4F4B-9AC8-AA55D312AF0C`  
 **Python struct format:** `<HHHBHHB`  
-**Total size:** 8 bytes  
+**Total size:** 10 bytes (device type byte + 9 data bytes)  
 **Pairing required:** Yes (for F0CD1504), No (for F0CD3003 detailed variant)
 
 **Byte Structure:**

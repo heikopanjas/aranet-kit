@@ -959,14 +959,23 @@ extension AranetClient: CBPeripheralDelegate {
                     }
 
                     // Format: <HHHBIQQB (28 bytes)
-                    // Skip first byte (device type)
-                    offset = 1
-                    let interval = readUInt16LE()
-                    let ago = readUInt16LE()
-                    let battery = readUInt8()
-                    let radiationRateRaw = readUInt32LE()
-                    let radiationTotal = readUInt64LE()
-                    let radiationDuration = readUInt64LE()
+                    // Python format unpacks bytes 0-27, where first H (bytes 0-1) includes device type byte
+                    //   value[0] = bytes 0-1 (H) - includes device type byte (0x0004)
+                    //   value[1] = bytes 2-3 (H) - interval
+                    //   value[2] = bytes 4-5 (H) - ago
+                    //   value[3] = byte 6 (B) - battery
+                    //   value[4] = bytes 7-10 (I) - rate
+                    //   value[5] = bytes 11-18 (Q) - total
+                    //   value[6] = bytes 19-26 (Q) - duration
+                    //   value[7] = byte 27 (B) - unknown
+                    // Skip bytes 0-1 (device type + first H from Python struct)
+                    offset = 2
+                    let interval = readUInt16LE()    // Read bytes 2-3 (value[1] from Python)
+                    let ago = readUInt16LE()         // Read bytes 4-5 (value[2] from Python)
+                    let battery = readUInt8()        // Read byte 6 (value[3] from Python)
+                    let radiationRateRaw = readUInt32LE()  // Read bytes 7-10 (value[4] from Python)
+                    let radiationTotal = readUInt64LE()    // Read bytes 11-18 (value[5] from Python)
+                    let radiationDuration = readUInt64LE() // Read bytes 19-26 (value[6] from Python)
 
                     // radiation_rate is stored as nSv/h * 10, divide by 10 to get nSv/h
                     let radiationRate = Double(radiationRateRaw) / 10.0
@@ -1042,19 +1051,20 @@ extension AranetClient: CBPeripheralDelegate {
             }
             // Aranet2 - first byte = 2
             else if deviceTypeByte == 2 {
-                guard data.count >= 8 else {
+                guard data.count >= 10 else {
                     throw AranetError.invalidData
                 }
 
                 // Format: <HHHBHHB
+                // Total size: 10 bytes (device type + 9 bytes of data)
                 // Skip first byte (device type)
                 offset = 1
-                let interval = readUInt16LE()
-                let ago = readUInt16LE()
-                let battery = readUInt8()
-                let tempRaw = readUInt16LE()
-                let humidity = readUInt8()
-                let statusRaw = readUInt8()
+                let interval = readUInt16LE()    // Bytes 1-2
+                let ago = readUInt16LE()         // Bytes 3-4
+                let battery = readUInt8()        // Byte 5
+                let tempRaw = readUInt16LE()     // Bytes 6-7
+                let humidity = readUInt8()        // Byte 8
+                let _ = readUInt8()              // Byte 9 - Status byte (bit-packed humidity/temperature status, not currently parsed)
 
                 let temperature = Double(tempRaw) / 20.0
 
