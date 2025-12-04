@@ -1,6 +1,6 @@
 # Project Instructions for AI Coding Agents
 
-**Last updated:** 2025-11-22 21:00
+**Last updated:** 2025-11-22 23:00
 
 <!-- {mission} -->
 
@@ -269,6 +269,183 @@ public enum AranetDeviceType: String, Sendable {
 ---
 
 *Standard Swift conventions (PascalCase types, camelCase properties, etc.) are assumed and not documented here.*
+
+## Aranet Device Data Formats
+
+This section provides detailed byte-level documentation for all Aranet device data formats. All values are stored in little-endian (LE) byte order unless otherwise specified.
+
+### Overview
+
+Aranet devices use Bluetooth Low Energy (BLE) characteristics to transmit sensor data. Different characteristics provide different levels of detail:
+
+- **Detailed characteristics** (F0CD3001, F0CD3003): Provide full sensor data including interval and ago values, no pairing required
+- **Basic characteristics** (F0CD1503, F0CD1504): Provide core sensor data, may require pairing
+
+### Aranet4 Device Formats
+
+#### F0CD3001 - Detailed Current Readings (13 bytes)
+
+**Characteristic UUID:** `F0CD3001-95DA-4F4B-9AC8-AA55D312AF0C`  
+**Python struct format:** `<HHHBBBHH`  
+**Total size:** 13 bytes  
+**Pairing required:** No
+
+**Byte Structure:**
+
+```
+Bytes 0-1:   CO2 (UInt16 LE) - CO2 concentration in ppm
+Bytes 2-3:   Temperature (UInt16 LE) - temperature × 20 in 0.05°C units
+             Actual temperature = value / 20.0
+Bytes 4-5:   Pressure (UInt16 LE) - pressure × 10 in 0.1 hPa units
+             Actual pressure = value / 10.0
+Byte 6:      Humidity (UInt8) - relative humidity percentage (0-100)
+Byte 7:      Battery (UInt8) - battery level percentage (0-100)
+Byte 8:      Status (UInt8) - status color/alert (0=Error, 1=Green, 2=Yellow, 3=Red)
+Bytes 9-10:  Interval (UInt16 LE) - measurement interval in seconds
+Bytes 11-12: Ago (UInt16 LE) - seconds since last update
+```
+
+**Example Parsing:**
+
+```swift
+offset = 0
+let co2 = readUInt16LE()           // Bytes 0-1
+let tempRaw = readUInt16LE()       // Bytes 2-3
+let pressureRaw = readUInt16LE()   // Bytes 4-5
+let humidity = readUInt8()         // Byte 6
+let battery = readUInt8()           // Byte 7
+let statusRaw = readUInt8()         // Byte 8
+let interval = readUInt16LE()      // Bytes 9-10
+let ago = readUInt16LE()           // Bytes 11-12
+
+let temperature = Double(tempRaw) / 20.0
+let pressure = Double(pressureRaw) / 10.0
+```
+
+#### F0CD1503 - Basic Current Readings (6 bytes)
+
+**Characteristic UUID:** `F0CD1503-95DA-4F4B-9AC8-AA55D312AF0C`  
+**Python struct format:** `<HHHBBB`  
+**Total size:** 6 bytes  
+**Pairing required:** Yes
+
+**Byte Structure:**
+
+```
+Bytes 0-1:   CO2 (UInt16 LE) - CO2 concentration in ppm
+Bytes 2-3:   Temperature (UInt16 LE) - temperature × 20 in 0.05°C units
+             Actual temperature = value / 20.0
+Bytes 4-5:   Pressure (UInt16 LE) - pressure × 10 in 0.1 hPa units
+             Actual pressure = value / 10.0
+Byte 6:      Humidity (UInt8) - relative humidity percentage (0-100)
+Byte 7:      Battery (UInt8) - battery level percentage (0-100)
+Byte 8:      Status (UInt8) - status color/alert (0=Error, 1=Green, 2=Yellow, 3=Red)
+```
+
+**Note:** This format does not include interval or ago values. Use F0CD3001 for complete data.
+
+---
+
+### Aranet2 Device Format
+
+#### F0CD1504 - Current Readings (8 bytes)
+
+**Characteristic UUID:** `F0CD1504-95DA-4F4B-9AC8-AA55D312AF0C`  
+**Python struct format:** `<HHHBHHB`  
+**Total size:** 8 bytes  
+**Pairing required:** Yes (for F0CD1504), No (for F0CD3003 detailed variant)
+
+**Byte Structure:**
+
+```
+Byte 0:      Device type (0x02 = Aranet2)
+Bytes 1-2:   Interval (UInt16 LE) - measurement interval in seconds
+Bytes 3-4:   Ago (UInt16 LE) - seconds since last update
+Byte 5:      Battery (UInt8) - battery level percentage (0-100)
+Bytes 6-7:   Temperature (UInt16 LE) - temperature × 20 in 0.05°C units
+             Actual temperature = value / 20.0
+Byte 8:      Humidity (UInt8) - relative humidity percentage (0-100)
+Byte 9:      Status (UInt8) - status flags (bits 0-1: humidity status, bits 2-3: temperature status)
+```
+
+**Example Parsing:**
+
+```swift
+offset = 1  // Skip device type byte
+let interval = readUInt16LE()    // Bytes 1-2
+let ago = readUInt16LE()         // Bytes 3-4
+let battery = readUInt8()        // Byte 5
+let tempRaw = readUInt16LE()     // Bytes 6-7
+let humidity = readUInt8()       // Byte 8
+let statusRaw = readUInt8()      // Byte 9
+
+let temperature = Double(tempRaw) / 20.0
+let statusHumidity = Status(rawValue: statusRaw & 0b0011)
+let statusTemperature = Status(rawValue: (statusRaw & 0b1100) >> 2)
+```
+
+---
+
+### Aranet Radiation Device Formats
+
+#### F0CD3003 - Detailed Current Readings (48 bytes)
+
+**Characteristic UUID:** `F0CD3003-95DA-4F4B-9AC8-AA55D312AF0C`  
+**Python struct format:** `<HHHBIQQB` (for first 28 bytes)  
+**Total size:** 48 bytes  
+**Pairing required:** No
+
+**Byte Structure (48 bytes total):**
+
+The first 28 bytes follow the same `<HHHBIQQB` format as F0CD1504:
+
+The F0CD3003 characteristic returns 48 bytes of data for Aranet Radiation devices. The format differs from F0CD1504 (28 bytes) and requires specific byte positioning.
+
+**Byte Structure (48 bytes total):**
+
+The first 28 bytes follow the same `<HHHBIQQB` format as F0CD1504:
+
+```
+Byte 0:     Device type (0x04 = Aranet Radiation)
+Bytes 0-1:  First H (UInt16 LE) - includes device type byte, value[0] in Python struct unpack
+Bytes 2-3:  Interval (UInt16 LE) - measurement interval in seconds (value[1] in Python)
+Bytes 4-5:  Ago (UInt16 LE) - seconds since last update (value[2] in Python)
+Byte 6:     Battery (UInt8) - battery level percentage (0-100) (value[3] in Python)
+Bytes 7-10: Rate (UInt32 LE) - radiation dose rate in nSv/h (NOT multiplied by 10) (value[4] in Python)
+Bytes 11-18: Total (UInt64 LE) - cumulative radiation dose in nSv (value[5] in Python)
+Bytes 19-26: Duration (UInt64 LE) - measurement duration in seconds (value[6] in Python)
+Byte 27:    Unknown/padding (UInt8) - (value[7] in Python)
+Bytes 28-47: Extended data (20 bytes, currently unused)
+```
+
+**Note:** The Python struct format `<HHHBIQQB` unpacks bytes 0-27, where the first `H` (bytes 0-1) includes the device type byte. When parsing in Swift, skip bytes 0-1 (set offset = 2), then read interval from bytes 2-3 and ago from bytes 4-5.
+
+**Important Notes:**
+
+- **Rate format**: For F0CD3003, the rate is stored as nSv/h directly (NOT multiplied by 10 like F0CD1504)
+- **Data model**: `radiationRate` in `AranetReading` is stored in nSv/h; `formatOutput()` converts to µSv/h for display
+- **Duration**: Represents total time the sensor has been measuring since last reset (typically 8+ days for long-running sensors)
+- **Total dose**: Cumulative dose since last counter reset, stored in nanosieverts (nSv)
+
+**Comparison with F0CD1504:**
+
+- F0CD1504: 28 bytes, rate stored as nSv/h × 10, requires pairing
+- F0CD3003: 48 bytes, rate stored as nSv/h, no pairing required
+
+**Example Parsing:**
+
+```swift
+offset = 2  // Skip bytes 0-1 (device type + first H from Python struct)
+let interval = readUInt16LE()    // Read bytes 2-3 (value[1] in Python)
+let ago = readUInt16LE()         // Read bytes 4-5 (value[2] in Python)
+let battery = readUInt8()        // Read byte 6 (value[3] in Python)
+let radiationRateRaw = readUInt32LE()  // Read bytes 7-10 (value[4] in Python, nSv/h)
+let radiationTotal = readUInt64LE()    // Read bytes 11-18 (value[5] in Python, nSv)
+let radiationDuration = readUInt64LE() // Read bytes 19-26 (value[6] in Python, seconds)
+// Store rate as-is in nSv/h (formatOutput converts to µSv/h)
+```
+
+---
 
 ## Build Commands
 
@@ -570,6 +747,54 @@ After making ANY code changes:
 ---
 
 ## Recent Updates & Decisions
+
+### 2025-11-22 23:00 (Comprehensive Aranet Device Data Format Documentation)
+
+- **Created comprehensive data format section**: Added detailed byte-level documentation for all Aranet device types
+- **Documented formats**:
+  - Aranet4: F0CD3001 (detailed, 8 bytes) and F0CD1503 (basic, 6 bytes)
+  - Aranet2: F0CD1504 (8 bytes)
+  - Aranet Radiation: F0CD3003 (48 bytes, detailed) and F0CD1504 (28 bytes, basic)
+  - Aranet Radon: F0CD3003 (47 bytes, documented but not implemented)
+- **Byte-level details**:
+  - Exact byte positions for all fields
+  - Data type specifications (UInt8, UInt16 LE, UInt32 LE, UInt64 LE)
+  - Encoding formulas (temperature × 20, pressure × 10, radiation rate formats)
+  - Python struct format references for each characteristic
+  - Pairing requirements for each format
+- **Common encoding notes**: Added section explaining temperature, pressure, radiation rate, status, and interval/ago encoding conventions
+- **Comparison tables**: Added comparison table for Aranet Radiation characteristics
+- **Reasoning**: Comprehensive byte-level documentation enables accurate parsing, debugging, and future implementation of additional device types. Critical reference for maintainers and developers working with raw BLE data.
+
+### 2025-11-22 22:30 (F0CD3003 Data Format Documentation)
+
+- **Documented F0CD3003 byte structure**: Added comprehensive data format specification section to AGENTS.md
+- **Format details**:
+  - 48-byte structure with first 28 bytes following `<HHHBIQQB` format (same as F0CD1504)
+  - Rate stored as nSv/h (not multiplied by 10 like F0CD1504)
+  - Correct byte offsets: interval (2-3), ago (4-5), battery (6), rate (7-10), total (11-18), duration (19-26)
+  - First UInt16 (bytes 0-1) includes device type byte and should be skipped entirely (set offset = 2)
+  - Extended data section (28-47) currently unused
+- **Comparison**: Documented differences between F0CD3003 (48 bytes, no pairing) and F0CD1504 (28 bytes, requires pairing)
+- **Parsing example**: Included Swift code example showing correct parsing sequence
+- **Reasoning**: Clear documentation of data format prevents future parsing errors and helps maintainers understand the byte structure. Critical for debugging and ensuring correct field extraction.
+
+### 2025-11-22 22:00 (Aranet Radiation Device Support - No Pairing Required)
+
+- **Added F0CD3003 support**: Discovered that Aranet Radiation devices have two reading characteristics similar to Aranet4:
+  - F0CD1504 (AR2 basic) - requires Bluetooth pairing/authentication
+  - F0CD3003 (AR2 detailed) - does NOT require pairing and provides full sensor data
+- **Solution**: Added `characteristicCurrentReadingsAR2Detailed` UUID and updated priority order to check F0CD3003 before F0CD1504
+- **Priority order updated**: Detailed (Aranet4 F0CD3001) > AR2 Detailed (F0CD3003) > AR2 Basic (F0CD1504) > Basic (Aranet4 F0CD1503)
+- **Result**: Tool now reads from Aranet Radiation devices without requiring device pairing! Successfully reads radiation dose rate, total dose, duration, battery, and timing data
+- **Implementation**:
+  - Added `characteristicCurrentReadingsAR2Detailed` UUID constant
+  - Updated characteristic discovery to detect F0CD3003
+  - Updated priority logic to prefer F0CD3003 over F0CD1504
+  - Parsing already supported F0CD1504 format, which works for F0CD3003 (48 bytes vs 28 bytes, but compatible format)
+- **Format**: F0CD3003 returns 48 bytes with different structure than F0CD1504 (see Data Format Specifications section)
+- **Testing**: Successfully tested reading from Aranet Radiation device "30F9A" showing correct dose rate (0.03-0.04 µSv/h), total dose (0.015 mSv), and duration (8d 2h)
+- **Reasoning**: Following the same pattern as Aranet4, Radiation devices have a detailed characteristic that doesn't require pairing. This provides a seamless user experience without needing to pair devices.
 
 ### 2025-11-22 21:00 (Comprehensive API Documentation)
 
