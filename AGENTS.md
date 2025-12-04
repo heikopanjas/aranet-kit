@@ -1,6 +1,6 @@
 # Project Instructions for AI Coding Agents
 
-**Last updated:** 2025-11-22 23:00
+**Last updated:** 2025-12-04 10:00
 
 <!-- {mission} -->
 
@@ -747,6 +747,19 @@ After making ANY code changes:
 ---
 
 ## Recent Updates & Decisions
+
+### 2025-12-04 10:00 (Scan Reliability Improvement)
+
+- **Issue**: Scan command was failing to detect devices approximately 50% of the time
+- **Root cause**: Default 5-second scan timeout was too short for Aranet devices which advertise infrequently to conserve battery
+- **Solution**: Increased default scan timeout from 5 seconds to 10 seconds
+- **Changes**:
+  - `AranetCli.swift`: Changed `Scan` command default timeout from 5.0 to 10.0 seconds
+  - `AranetClient.swift`: Updated library default timeout from 5.0 to 10.0 seconds
+  - Added verbose logging when scan starts and when devices are discovered
+  - Updated documentation to explain why longer timeouts improve discovery reliability
+- **Also fixed**: Boolean comparison style in `didDiscover` delegate method to use explicit `== false` comparison
+- **Reasoning**: Aranet devices advertise at low frequencies to preserve battery life. The Python implementation uses 10 seconds as the default. Matching this default improves discovery reliability without significantly impacting user experience.
 
 ### 2025-11-22 23:00 (Comprehensive Aranet Device Data Format Documentation)
 

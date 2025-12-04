@@ -153,7 +153,7 @@ extension AranetCli {
         )
 
         @Option(name: .shortAndLong, help: "Scan timeout in seconds")
-        var timeout: Double = 5.0
+        var timeout: Double = 10.0
 
         @Flag(name: .shortAndLong, help: "Show verbose output")
         var verbose: Bool = false

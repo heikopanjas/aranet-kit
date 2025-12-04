@@ -257,7 +257,9 @@ public class AranetClient: NSObject, @unchecked Sendable {
     /// Performs a Bluetooth Low Energy scan looking for Aranet devices advertising their
     /// service UUIDs. The scan automatically stops after the specified timeout period.
     ///
-    /// - Parameter timeout: Maximum time to scan in seconds. Default is 5.0 seconds.
+    /// - Parameter timeout: Maximum time to scan in seconds. Default is 10.0 seconds.
+    ///   Aranet devices advertise infrequently to conserve battery, so longer timeouts
+    ///   improve discovery reliability.
     ///
     /// - Returns: Array of discovered `CBPeripheral` objects representing Aranet devices.
     ///   The array may be empty if no devices are found within the timeout period.
@@ -275,10 +277,14 @@ public class AranetClient: NSObject, @unchecked Sendable {
     ///     print("Found: \\(device.name ?? "Unknown")")
     /// }
     /// ```
-    public func scan(timeout: TimeInterval = 5.0) async throws -> [CBPeripheral] {
+    public func scan(timeout: TimeInterval = 10.0) async throws -> [CBPeripheral] {
         try await waitForBluetoothReady()
 
         discoveredPeripherals.removeAll()
+
+        if verbose == true {
+            print("[DEBUG] Starting BLE scan for \(timeout) seconds...")
+        }
 
         return try await withCheckedThrowingContinuation { [weak self] continuation in
             guard let self = self else { return }
@@ -596,7 +602,10 @@ extension AranetClient: CBCentralManagerDelegate {
     public func centralManager(
         _ central: CBCentralManager, didDiscover peripheral: CBPeripheral, advertisementData: [String: Any], rssi RSSI: NSNumber
     ) {
-        if !discoveredPeripherals.contains(where: { $0.identifier == peripheral.identifier }) {
+        if discoveredPeripherals.contains(where: { $0.identifier == peripheral.identifier }) == false {
+            if verbose == true {
+                print("[DEBUG] Discovered device: \(peripheral.name ?? "Unknown") (RSSI: \(RSSI) dBm)")
+            }
             discoveredPeripherals.append(peripheral)
         }
     }
