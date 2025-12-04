@@ -1,6 +1,6 @@
 # Project Instructions for AI Coding Agents
 
-**Last updated:** 2025-12-04 10:00
+**Last updated:** 2025-12-04 11:00
 
 <!-- {mission} -->
 
@@ -705,9 +705,18 @@ fix: update `KString` with "nested 'quotes'" & $special chars!
 
 ## Semantic Versioning Protocol
 
-**AUTOMATICALLY track version changes using semantic versioning (SemVer) in Cargo.toml.**
+**AUTOMATICALLY track version changes using semantic versioning (SemVer).**
 
-The current version is defined in `Cargo.toml` under `[package]` section as `version = "X.Y.Z"`.
+The current version is defined in `Sources/AranetCli/AranetCli.swift` in the `CommandConfiguration` as `version: "X.Y.Z"`.
+
+```swift
+static let configuration = CommandConfiguration(
+    commandName: "aranetcli",
+    abstract: "Command-line tool for Aranet Bluetooth sensors",
+    version: "1.0.0",  // <-- Update this version
+    subcommands: [Scan.self, Read.self, Monitor.self]
+)
+```
 
 ### Version Format: MAJOR.MINOR.PATCH
 
@@ -738,7 +747,7 @@ The current version is defined in `Cargo.toml` under `[package]` section as `ver
 After making ANY code changes:
 
 1. Determine the type of change (fix, feature, or breaking change)
-2. Update the version in `Cargo.toml` accordingly
+2. Update the version in `AranetCli.swift` CommandConfiguration accordingly
 3. Include the version change in the same commit as the code change
 4. Mention version bump in commit message footer if significant
 
@@ -747,6 +756,13 @@ After making ANY code changes:
 ---
 
 ## Recent Updates & Decisions
+
+### 2025-12-04 11:00 (Semantic Versioning Documentation Fix)
+
+- **Fixed incorrect reference**: Changed Cargo.toml reference to AranetCli.swift
+- **Added code example**: Shows exact location of version in CommandConfiguration
+- **Updated process steps**: References correct file path for version updates
+- **Reasoning**: This is a Swift project, not Rust. Version is tracked in the CommandConfiguration of the main CLI struct at `Sources/AranetCli/AranetCli.swift`.
 
 ### 2025-12-04 10:00 (Scan Reliability Improvement)
 
