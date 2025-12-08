@@ -505,7 +505,7 @@ public class AranetClient: NSObject, @unchecked Sendable {
         continuation: AsyncStream<Result<AranetReading, Error>>.Continuation
     ) async {
         var currentDelay = initialDelay
-        let baseInterval = interval
+        var currentInterval = interval
 
         while Task.isCancelled == false {
             // Wait for the specified interval using Timer on main actor
@@ -529,11 +529,19 @@ public class AranetClient: NSObject, @unchecked Sendable {
                 let reading = try await self.readCurrentReadings(from: peripheral)
                 continuation.yield(.success(reading))
 
+                // Update interval from device (user may have changed it)
+                if let newInterval = reading.interval {
+                    if currentInterval != TimeInterval(newInterval) && self.verbose == true {
+                        print("[DEBUG] Device interval changed: \(Int(currentInterval))s -> \(newInterval)s")
+                    }
+                    currentInterval = TimeInterval(newInterval)
+                }
+
                 // Calculate next delay: wait for one full interval from now, plus 3 seconds
                 // This ensures we read 3 seconds after the next sensor update
                 if let ago = reading.ago {
                     // Time until next sensor update
-                    let timeUntilNextUpdate = baseInterval - TimeInterval(ago)
+                    let timeUntilNextUpdate = currentInterval - TimeInterval(ago)
                     currentDelay = timeUntilNextUpdate + 3.0
 
                     if self.verbose == true {
@@ -542,10 +550,10 @@ public class AranetClient: NSObject, @unchecked Sendable {
                     }
                 }
                 else {
-                    // Fallback: use base interval + 3 seconds
-                    currentDelay = baseInterval + 3.0
+                    // Fallback: use current interval + 3 seconds
+                    currentDelay = currentInterval + 3.0
                     if self.verbose == true {
-                        print("[DEBUG] Age not available, using base interval + 3s")
+                        print("[DEBUG] Age not available, using current interval + 3s")
                     }
                 }
             }

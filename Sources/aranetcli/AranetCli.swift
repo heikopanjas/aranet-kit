@@ -139,7 +139,7 @@ struct AranetCli: AsyncParsableCommand {
     static let configuration = CommandConfiguration(
         commandName: "aranetcli",
         abstract: "Command-line tool for Aranet Bluetooth sensors",
-        version: "1.0.0",
+        version: "1.0.1",
         subcommands: [Scan.self, Read.self, Monitor.self]
     )
 }

@@ -1,6 +1,6 @@
 # Project Instructions for AI Coding Agents
 
-**Last updated:** 2025-12-04 11:00
+**Last updated:** 2025-12-08 14:30
 
 <!-- {mission} -->
 
@@ -756,6 +756,21 @@ After making ANY code changes:
 ---
 
 ## Recent Updates & Decisions
+
+### 2025-12-08 14:30 (Monitor Command Bug Fix - Dynamic Interval Update)
+
+- **Bug**: Monitor command was not detecting when the user changed the sensor update interval via the Aranet app or external tools
+- **Root cause**: The monitoring loop captured the interval from the initial reading and stored it in a constant variable called baseInterval, which was never updated
+- **Solution**: Changed baseInterval to currentInterval and update it on each monitoring cycle from the device-reported interval value
+- **Implementation details**:
+  - Renamed baseInterval to currentInterval to reflect that it can change
+  - Added check after each reading to update currentInterval if the device reports a new interval value
+  - Added verbose logging when interval changes are detected
+  - All delay calculations now use currentInterval instead of the stale baseInterval
+- **Version bump**: 1.0.0 to 1.0.1 (PATCH - bug fix)
+- **Files changed**: AranetClient.swift, AranetCli.swift
+- **Impact**: Monitor command now properly adapts to interval changes made during monitoring session
+- **Reasoning**: Each sensor reading includes the current device interval setting. By reading this value on every cycle, the monitor command automatically adapts to configuration changes without requiring restart. This provides better user experience when experimenting with different monitoring intervals.
 
 ### 2025-12-04 11:00 (Semantic Versioning Documentation Fix)
 
