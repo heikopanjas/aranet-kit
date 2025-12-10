@@ -1,6 +1,6 @@
 # Project Instructions for AI Coding Agents
 
-**Last updated:** 2025-12-08 14:30
+**Last updated:** 2025-12-10 17:00
 
 <!-- {mission} -->
 
@@ -269,6 +269,115 @@ public enum AranetDeviceType: String, Sendable {
 ---
 
 *Standard Swift conventions (PascalCase types, camelCase properties, etc.) are assumed and not documented here.*
+
+---
+
+## Swift Foundation Units
+
+### Overview
+
+AranetKit uses Swift Foundation's `Measurement<Unit>` types for all physical quantities. This provides type safety, automatic unit conversions, and better API semantics.
+
+### Standard Foundation Units
+
+The following measurements use built-in Foundation unit types:
+
+- **Temperature**: `Measurement<UnitTemperature>` - stored in celsius
+- **Pressure**: `Measurement<UnitPressure>` - stored in hectopascals
+
+Example usage:
+
+```swift
+let reading = try await client.readCurrentReadings(from: device)
+
+// Access value in native unit (Celsius)
+let tempC = reading.temperature?.value
+
+// Convert to different unit
+let tempF = reading.temperature?.converted(to: .fahrenheit)
+print("Temperature: \(tempF.value)°F")
+```
+
+### Custom Unit Types
+
+AranetKit defines custom `Dimension` subclasses for radiation and radioactivity measurements.
+
+#### UnitRadiationDose
+
+Measures ionizing radiation dose with base unit nanosieverts (nSv).
+
+**Available units:**
+- `.nanosieverts` (nSv) - base unit, coefficient 1.0
+- `.microsieverts` (µSv) - coefficient 1000.0
+- `.millisieverts` (mSv) - coefficient 1,000,000.0
+- `.sieverts` (Sv) - coefficient 1,000,000,000.0
+
+**Usage:**
+
+```swift
+// Radiation rate stored in nSv/h
+let rateNsv = reading.radiationRate?.value
+
+// Convert to microsieverts for display
+let rateMicroSv = reading.radiationRate?.converted(to: .microsieverts)
+print("Dose rate: \(rateMicroSv.value) µSv/h")
+
+// Cumulative dose
+let totalMsv = reading.radiationTotal?.converted(to: .millisieverts)
+print("Total dose: \(totalMsv.value) mSv")
+```
+
+**Typical values:**
+- Background radiation: 50-200 nSv/h (0.05-0.2 µSv/h)
+- Annual limit (public): ~100 µSv
+
+#### UnitRadioactivity
+
+Measures radon gas concentration with base unit becquerels per cubic meter (Bq/m³).
+
+**Available units:**
+- `.becquerelsPerCubicMeter` (Bq/m³) - base unit, SI standard
+- `.picocuriesPerLiter` (pCi/L) - coefficient 37.0, common in USA
+
+**Usage:**
+
+```swift
+// Radon concentration stored in Bq/m³
+let radonBq = reading.radonConcentration?.value
+
+// Convert to picocuries per liter
+let radonPci = reading.radonConcentration?.converted(to: .picocuriesPerLiter)
+print("Radon: \(radonPci.value) pCi/L")
+```
+
+**Reference levels:**
+- WHO action level: 100 Bq/m³
+- EPA action level: 148 Bq/m³ (4 pCi/L)
+
+### Primitive Values
+
+The following properties remain as primitive types (not Measurements):
+
+- `humidity: UInt8?` - percentage (0-100), dimensionless
+- `battery: UInt8` - percentage (0-100), dimensionless
+- `co2: UInt16?` - parts per million (ppm), dimensionless ratio
+- `interval: UInt16?` - seconds, simple duration
+- `ago: UInt16?` - seconds, simple duration
+- `radiationDuration: UInt64?` - seconds, simple duration
+
+**Rationale**: These are either dimensionless quantities (percentages, ratios) or simple time durations that don't benefit from the `Measurement` overhead.
+
+### Data Format Documentation
+
+When parsing raw BLE data, values are converted to their native units:
+
+- Temperature: raw value / 20.0 → Celsius
+- Pressure: raw value / 10.0 → hectopascals (hPa)
+- Radiation rate: raw value or (raw value / 10.0) → nanosieverts per hour (nSv/h)
+- Radiation total: raw value → nanosieverts (nSv)
+- Radon concentration: raw value → becquerels per cubic meter (Bq/m³)
+
+---
 
 ## Aranet Device Data Formats
 
@@ -756,6 +865,29 @@ After making ANY code changes:
 ---
 
 ## Recent Updates & Decisions
+
+### 2025-12-10 17:00 (Swift Foundation Units API - BREAKING CHANGE)
+
+- **Major refactoring**: Migrated library API to use Swift Foundation's `Measurement<Unit>` types for all physical quantities
+- **Breaking change**: Version bumped from 1.0.1 to 2.0.0 (MAJOR)
+- **Custom unit types created**:
+  - `UnitRadiationDose` (Dimension subclass) - nanosieverts, microsieverts, millisieverts, sieverts
+  - `UnitRadioactivity` (Dimension subclass) - becquerels per cubic meter, picocuries per liter
+- **Properties changed to Measurement**:
+  - `temperature: Double?` → `Measurement<UnitTemperature>?`
+  - `pressure: Double?` → `Measurement<UnitPressure>?`
+  - `radiationRate: Double?` → `Measurement<UnitRadiationDose>?`
+  - `radiationTotal: Double?` → `Measurement<UnitRadiationDose>?`
+  - `radonConcentration: UInt32?` → `Measurement<UnitRadioactivity>?`
+- **Properties kept as primitives**: humidity, battery (percentages), co2 (ppm), time values (seconds)
+- **Benefits**:
+  - Type-safe physical quantities with compiler-checked units
+  - Automatic unit conversions via `.converted(to:)` method
+  - Better API semantics and self-documenting code
+  - Standard Swift patterns for measurements
+- **Migration impact**: External code needs to access `.value` property and update type signatures
+- **Files updated**: Units.swift (new), AranetTypes.swift, AranetClient.swift, AranetCli.swift, AGENTS.md
+- **Reasoning**: Using Foundation's Measurement types provides type safety, automatic conversions, and follows Swift best practices. Custom Dimension subclasses enable proper handling of radiation and radioactivity units not present in standard Foundation. Keeping simple values (percentages, ppm, time) as primitives avoids unnecessary complexity for dimensionless quantities.
 
 ### 2025-12-08 14:30 (Monitor Command Bug Fix - Dynamic Interval Update)
 

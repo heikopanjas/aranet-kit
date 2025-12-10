@@ -1,24 +1,26 @@
 {
     "configurations": [
       {
-        "type": "swift",
+        "type": "lldb",
         "request": "launch",
         "args": [],
         "cwd": "${workspaceFolder:aranet-kit}",
         "name": "Debug aranetcli",
         "target": "aranetcli",
         "configuration": "debug",
-        "preLaunchTask": "swift: Build Debug aranetcli"
+        "preLaunchTask": "swift: Build Debug aranetcli",
+        "program": "${workspaceFolder:aranet-kit}/.build/debug/aranetcli"
       },
       {
-        "type": "swift",
+        "type": "lldb",
         "request": "launch",
         "args": [],
         "cwd": "${workspaceFolder:aranet-kit}",
         "name": "Release aranetcli",
         "target": "aranetcli",
         "configuration": "release",
-        "preLaunchTask": "swift: Build Release aranetcli"
+        "preLaunchTask": "swift: Build Release aranetcli",
+        "program": "${workspaceFolder:aranet-kit}/.build/release/aranetcli"
       }
     ]
 }
