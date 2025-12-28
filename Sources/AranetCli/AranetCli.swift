@@ -46,13 +46,13 @@ extension AranetReading {
                     output += "CO2:          \(co2) ppm\n"
                 }
                 if let temperature = temperature {
-                    output += String(format: "Temperature:  %.1f °C\n", temperature)
+                    output += String(format: "Temperature:  %.1f °C\n", temperature.value)
                 }
                 if let humidity = humidity {
                     output += "Humidity:     \(humidity) %\n"
                 }
                 if let pressure = pressure {
-                    output += String(format: "Pressure:     %.1f hPa\n", pressure)
+                    output += String(format: "Pressure:     %.1f hPa\n", pressure.value)
                 }
                 output += "Battery:      \(battery) %\n"
                 if let status = status {
@@ -64,7 +64,7 @@ extension AranetReading {
 
             case .aranet2:
                 if let temperature = temperature {
-                    output += String(format: "Temperature:  %.1f °C\n", temperature)
+                    output += String(format: "Temperature:  %.1f °C\n", temperature.value)
                 }
                 if let humidity = humidity {
                     output += "Humidity:     \(humidity) %\n"
@@ -76,7 +76,8 @@ extension AranetReading {
 
             case .aranetRadiation:
                 if let radiationRate = radiationRate {
-                    output += String(format: "Dose rate:    %.2f µSv/h\n", radiationRate / 1000.0)
+                    let microSvPerHour = radiationRate.converted(to: .microsieverts)
+                    output += String(format: "Dose rate:    %.2f µSv/h\n", microSvPerHour.value)
                 }
                 if let radiationTotal = radiationTotal, let radiationDuration = radiationDuration {
                     let seconds = Int(radiationDuration)
@@ -92,9 +93,10 @@ extension AranetReading {
                         durationStr = "\(days)d \(durationStr)"
                     }
 
+                    let milliSv = radiationTotal.converted(to: .millisieverts)
                     output +=
                         String(
-                            format: "Dose total:   %.4f mSv/%@\n", radiationTotal / 1_000_000.0,
+                            format: "Dose total:   %.4f mSv/%@\n", milliSv.value,
                             durationStr)
                 }
                 output += "Battery:      \(battery) %\n"
@@ -104,16 +106,16 @@ extension AranetReading {
 
             case .aranetRadon:
                 if let radonConcentration = radonConcentration {
-                    output += "Radon Conc.:  \(radonConcentration) Bq/m³\n"
+                    output += String(format: "Radon Conc.:  %.0f Bq/m³\n", radonConcentration.value)
                 }
                 if let temperature = temperature {
-                    output += String(format: "Temperature:  %.1f °C\n", temperature)
+                    output += String(format: "Temperature:  %.1f °C\n", temperature.value)
                 }
                 if let humidity = humidity {
                     output += "Humidity:     \(humidity) %\n"
                 }
                 if let pressure = pressure {
-                    output += String(format: "Pressure:     %.1f hPa\n", pressure)
+                    output += String(format: "Pressure:     %.1f hPa\n", pressure.value)
                 }
                 output += "Battery:      \(battery) %\n"
                 if let status = status {
@@ -139,7 +141,7 @@ struct AranetCli: AsyncParsableCommand {
     static let configuration = CommandConfiguration(
         commandName: "aranetcli",
         abstract: "Command-line tool for Aranet Bluetooth sensors",
-        version: "1.0.0",
+        version: "2.0.0",
         subcommands: [Scan.self, Read.self, Monitor.self]
     )
 }
@@ -153,7 +155,7 @@ extension AranetCli {
         )
 
         @Option(name: .shortAndLong, help: "Scan timeout in seconds")
-        var timeout: Double = 5.0
+        var timeout: Double = 10.0
 
         @Flag(name: .shortAndLong, help: "Show verbose output")
         var verbose: Bool = false

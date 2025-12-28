@@ -60,6 +60,9 @@ public struct AranetUUID {
     /// Aranet2 current readings characteristic.
     public static let characteristicCurrentReadingsAR2 = CBUUID(string: "F0CD1504-95DA-4F4B-9AC8-AA55D312AF0C")
 
+    /// Aranet2/Radiation detailed current readings characteristic (no pairing required).
+    public static let characteristicCurrentReadingsAR2Detailed = CBUUID(string: "F0CD3003-95DA-4F4B-9AC8-AA55D312AF0C")
+
     /// Measurement interval characteristic (time between sensor updates).
     public static let characteristicInterval = CBUUID(string: "F0CD2002-95DA-4F4B-9AC8-AA55D312AF0C")
 
@@ -184,6 +187,7 @@ public class AranetClient: NSObject, @unchecked Sendable {
     private var deviceName: String = ""
     private var deviceVersion: String = ""
     private var readingData: Data?
+    private var readingCharacteristicUUID: CBUUID?
     private var pendingReads: Set<CBUUID> = []
     private var servicesDiscovered = 0
     private var expectedServices = 0
@@ -253,7 +257,9 @@ public class AranetClient: NSObject, @unchecked Sendable {
     /// Performs a Bluetooth Low Energy scan looking for Aranet devices advertising their
     /// service UUIDs. The scan automatically stops after the specified timeout period.
     ///
-    /// - Parameter timeout: Maximum time to scan in seconds. Default is 5.0 seconds.
+    /// - Parameter timeout: Maximum time to scan in seconds. Default is 10.0 seconds.
+    ///   Aranet devices advertise infrequently to conserve battery, so longer timeouts
+    ///   improve discovery reliability.
     ///
     /// - Returns: Array of discovered `CBPeripheral` objects representing Aranet devices.
     ///   The array may be empty if no devices are found within the timeout period.
@@ -271,10 +277,14 @@ public class AranetClient: NSObject, @unchecked Sendable {
     ///     print("Found: \\(device.name ?? "Unknown")")
     /// }
     /// ```
-    public func scan(timeout: TimeInterval = 5.0) async throws -> [CBPeripheral] {
+    public func scan(timeout: TimeInterval = 10.0) async throws -> [CBPeripheral] {
         try await waitForBluetoothReady()
 
         discoveredPeripherals.removeAll()
+
+        if verbose == true {
+            print("[DEBUG] Starting BLE scan for \(timeout) seconds...")
+        }
 
         return try await withCheckedThrowingContinuation { [weak self] continuation in
             guard let self = self else { return }
@@ -339,6 +349,7 @@ public class AranetClient: NSObject, @unchecked Sendable {
         self.deviceName = ""
         self.deviceVersion = ""
         self.readingData = nil
+        self.readingCharacteristicUUID = nil
         self.pendingReads = Set()
         self.servicesDiscovered = 0
         self.expectedServices = 0
@@ -494,7 +505,7 @@ public class AranetClient: NSObject, @unchecked Sendable {
         continuation: AsyncStream<Result<AranetReading, Error>>.Continuation
     ) async {
         var currentDelay = initialDelay
-        let baseInterval = interval
+        var currentInterval = interval
 
         while Task.isCancelled == false {
             // Wait for the specified interval using Timer on main actor
@@ -518,11 +529,19 @@ public class AranetClient: NSObject, @unchecked Sendable {
                 let reading = try await self.readCurrentReadings(from: peripheral)
                 continuation.yield(.success(reading))
 
+                // Update interval from device (user may have changed it)
+                if let newInterval = reading.interval {
+                    if currentInterval != TimeInterval(newInterval) && self.verbose == true {
+                        print("[DEBUG] Device interval changed: \(Int(currentInterval))s -> \(newInterval)s")
+                    }
+                    currentInterval = TimeInterval(newInterval)
+                }
+
                 // Calculate next delay: wait for one full interval from now, plus 3 seconds
                 // This ensures we read 3 seconds after the next sensor update
                 if let ago = reading.ago {
                     // Time until next sensor update
-                    let timeUntilNextUpdate = baseInterval - TimeInterval(ago)
+                    let timeUntilNextUpdate = currentInterval - TimeInterval(ago)
                     currentDelay = timeUntilNextUpdate + 3.0
 
                     if self.verbose == true {
@@ -531,10 +550,10 @@ public class AranetClient: NSObject, @unchecked Sendable {
                     }
                 }
                 else {
-                    // Fallback: use base interval + 3 seconds
-                    currentDelay = baseInterval + 3.0
+                    // Fallback: use current interval + 3 seconds
+                    currentDelay = currentInterval + 3.0
                     if self.verbose == true {
-                        print("[DEBUG] Age not available, using base interval + 3s")
+                        print("[DEBUG] Age not available, using current interval + 3s")
                     }
                 }
             }
@@ -591,7 +610,10 @@ extension AranetClient: CBCentralManagerDelegate {
     public func centralManager(
         _ central: CBCentralManager, didDiscover peripheral: CBPeripheral, advertisementData: [String: Any], rssi RSSI: NSNumber
     ) {
-        if !discoveredPeripherals.contains(where: { $0.identifier == peripheral.identifier }) {
+        if discoveredPeripherals.contains(where: { $0.identifier == peripheral.identifier }) == false {
+            if verbose == true {
+                print("[DEBUG] Discovered device: \(peripheral.name ?? "Unknown") (RSSI: \(RSSI) dBm)")
+            }
             discoveredPeripherals.append(peripheral)
         }
     }
@@ -693,6 +715,12 @@ extension AranetClient: CBPeripheralDelegate {
                 }
                 availableReadingChars.insert(characteristic.uuid)
             }
+            else if characteristic.uuid == AranetUUID.characteristicCurrentReadingsAR2Detailed {
+                if verbose == true {
+                    print("[DEBUG] Found AR2 detailed current readings characteristic")
+                }
+                availableReadingChars.insert(characteristic.uuid)
+            }
             else if characteristic.uuid == AranetUUID.characteristicCurrentReadingsAR2 {
                 if verbose == true {
                     print("[DEBUG] Found AR2 current readings characteristic")
@@ -710,11 +738,17 @@ extension AranetClient: CBPeripheralDelegate {
             // Now decide which characteristic to read based on priority
             var readingCharToRead: CBUUID? = nil
 
-            // Priority: Detailed > AR2 > Basic
+            // Priority: Detailed (Aranet4) > AR2 Detailed > AR2 Basic > Basic (Aranet4)
             if availableReadingChars.contains(AranetUUID.characteristicCurrentReadingsDetailed) {
                 readingCharToRead = AranetUUID.characteristicCurrentReadingsDetailed
                 if verbose == true {
                     print("[DEBUG] Will read detailed current readings (F0CD3001)")
+                }
+            }
+            else if availableReadingChars.contains(AranetUUID.characteristicCurrentReadingsAR2Detailed) {
+                readingCharToRead = AranetUUID.characteristicCurrentReadingsAR2Detailed
+                if verbose == true {
+                    print("[DEBUG] Will read AR2 detailed current readings (F0CD3003)")
                 }
             }
             else if availableReadingChars.contains(AranetUUID.characteristicCurrentReadingsAR2) {
@@ -732,6 +766,7 @@ extension AranetClient: CBPeripheralDelegate {
 
             // Now initiate the reads
             if let readingChar = readingCharToRead {
+                readingCharacteristicUUID = readingChar
                 // Find the characteristic and read it
                 for service in peripheral.services ?? [] {
                     if let characteristics = service.characteristics {
@@ -806,6 +841,7 @@ extension AranetClient: CBPeripheralDelegate {
             if characteristic.uuid == AranetUUID.characteristicCurrentReadingsDetailed
                 || characteristic.uuid == AranetUUID.characteristicCurrentReadings
                 || characteristic.uuid == AranetUUID.characteristicCurrentReadingsAR2
+                || characteristic.uuid == AranetUUID.characteristicCurrentReadingsAR2Detailed
             {
                 encryptionErrors += 1
                 if verbose == true {
@@ -836,6 +872,7 @@ extension AranetClient: CBPeripheralDelegate {
         else if characteristic.uuid == AranetUUID.characteristicCurrentReadingsDetailed
             || characteristic.uuid == AranetUUID.characteristicCurrentReadings
             || characteristic.uuid == AranetUUID.characteristicCurrentReadingsAR2
+            || characteristic.uuid == AranetUUID.characteristicCurrentReadingsAR2Detailed
         {
             readingData = data
             if verbose == true {
@@ -878,7 +915,7 @@ extension AranetClient: CBPeripheralDelegate {
         do {
             // Use peripheral name as fallback if deviceName is empty
             let name = deviceName.isEmpty ? (peripheral?.name ?? "Unknown") : deviceName
-            let reading = try parseReading(data: data, name: name, version: deviceVersion)
+            let reading = try parseReading(data: data, name: name, version: deviceVersion, characteristicUUID: readingCharacteristicUUID)
             continuation?.resume(returning: reading)
             continuation = nil
             disconnect()
@@ -890,11 +927,7 @@ extension AranetClient: CBPeripheralDelegate {
         }
     }
 
-    private func parseReading(data: Data, name: String, version: String) throws -> AranetReading {
-        guard data.count >= 7 else {
-            throw AranetError.invalidData
-        }
-
+    private func parseReading(data: Data, name: String, version: String, characteristicUUID: CBUUID?) throws -> AranetReading {
         var offset = 0
 
         func readUInt16LE() -> UInt16 {
@@ -903,43 +936,228 @@ extension AranetClient: CBPeripheralDelegate {
             return UInt16(littleEndian: value)
         }
 
+        func readUInt32LE() -> UInt32 {
+            let value = data.withUnsafeBytes { $0.loadUnaligned(fromByteOffset: offset, as: UInt32.self) }
+            offset += 4
+            return UInt32(littleEndian: value)
+        }
+
+        func readUInt64LE() -> UInt64 {
+            let value = data.withUnsafeBytes { $0.loadUnaligned(fromByteOffset: offset, as: UInt64.self) }
+            offset += 8
+            return UInt64(littleEndian: value)
+        }
+
         func readUInt8() -> UInt8 {
             let value = data[offset]
             offset += 1
             return value
         }
 
-        let co2 = readUInt16LE()
-        let tempRaw = readUInt16LE()
-        let pressureRaw = readUInt16LE()
-        let humidity = readUInt8()
-        let battery = readUInt8()
-        let statusRaw = readUInt8()
+        // Check if this is F0CD1504 or F0CD3003 (AR2 characteristics) which support multiple device types
+        if characteristicUUID == AranetUUID.characteristicCurrentReadingsAR2
+            || characteristicUUID == AranetUUID.characteristicCurrentReadingsAR2Detailed
+        {
+            guard data.count >= 1 else {
+                throw AranetError.invalidData
+            }
 
-        let temperature = Double(tempRaw) / 20.0
-        let pressure = Double(pressureRaw) / 10.0
-        let status = AranetStatusColor(rawValue: statusRaw)
+            let deviceTypeByte = readUInt8()
+            offset = 0 // Reset offset to parse from beginning
 
-        var interval: UInt16?
-        var ago: UInt16?
+            // Aranet Radiation (Nucleo) - first byte = 4
+            if deviceTypeByte == 4 {
+                // F0CD1504 format: <HHHBIQQB (28 bytes) - includes interval/ago in first bytes
+                // F0CD3003 format: 48 bytes - interval/ago may be at different positions
+                if data.count == 28 {
+                    // F0CD1504 format (28 bytes)
+                    guard data.count >= 28 else {
+                        throw AranetError.invalidData
+                    }
 
-        if data.count >= 11 {
-            interval = readUInt16LE()
-            ago = readUInt16LE()
+                    // Format: <HHHBIQQB (28 bytes)
+                    // Python format unpacks bytes 0-27, where first H (bytes 0-1) includes device type byte
+                    //   value[0] = bytes 0-1 (H) - includes device type byte (0x0004)
+                    //   value[1] = bytes 2-3 (H) - interval
+                    //   value[2] = bytes 4-5 (H) - ago
+                    //   value[3] = byte 6 (B) - battery
+                    //   value[4] = bytes 7-10 (I) - rate
+                    //   value[5] = bytes 11-18 (Q) - total
+                    //   value[6] = bytes 19-26 (Q) - duration
+                    //   value[7] = byte 27 (B) - unknown
+                    // Skip bytes 0-1 (device type + first H from Python struct)
+                    offset = 2
+                    let interval = readUInt16LE()    // Read bytes 2-3 (value[1] from Python)
+                    let ago = readUInt16LE()         // Read bytes 4-5 (value[2] from Python)
+                    let battery = readUInt8()        // Read byte 6 (value[3] from Python)
+                    let radiationRateRaw = readUInt32LE()  // Read bytes 7-10 (value[4] from Python)
+                    let radiationTotal = readUInt64LE()    // Read bytes 11-18 (value[5] from Python)
+                    let radiationDuration = readUInt64LE() // Read bytes 19-26 (value[6] from Python)
+
+                    // radiation_rate is stored as nSv/h * 10, divide by 10 to get nSv/h
+                    let radiationRateValue = Double(radiationRateRaw) / 10.0
+                    let radiationRate = Measurement(value: radiationRateValue, unit: UnitRadiationDose.nanosieverts)
+                    let radiationTotalMeasurement = Measurement(value: Double(radiationTotal), unit: UnitRadiationDose.nanosieverts)
+
+                    return AranetReading(
+                        deviceType: .aranetRadiation,
+                        name: name,
+                        version: version,
+                        temperature: nil,
+                        humidity: nil,
+                        co2: nil,
+                        pressure: nil,
+                        radiationRate: radiationRate,
+                        radiationTotal: radiationTotalMeasurement,
+                        radiationDuration: radiationDuration,
+                        radonConcentration: nil,
+                        battery: battery,
+                        status: nil,
+                        interval: interval,
+                        ago: ago
+                    )
+                }
+                else if data.count >= 48 {
+                    // F0CD3003 format (48 bytes) - uses same <HHHBIQQB format as F0CD1504 for first 28 bytes
+                    // Python format <HHHBIQQB unpacks bytes 0-27:
+                    //   value[0] = bytes 0-1 (H) - includes device type byte (0x0004)
+                    //   value[1] = bytes 2-3 (H) - interval
+                    //   value[2] = bytes 4-5 (H) - ago
+                    //   value[3] = byte 6 (B) - battery
+                    //   value[4] = bytes 7-10 (I) - rate
+                    //   value[5] = bytes 11-18 (Q) - total
+                    //   value[6] = bytes 19-26 (Q) - duration
+                    //   value[7] = byte 27 (B) - unknown
+                    // Skip bytes 0-1 (device type + first H from Python struct)
+                    offset = 2
+                    let interval = readUInt16LE()    // Read bytes 2-3 (value[1] from Python)
+                    let ago = readUInt16LE()         // Read bytes 4-5 (value[2] from Python)
+                    let battery = readUInt8()        // Read byte 6 (value[3] from Python)
+
+                    if verbose == true {
+                        print("[DEBUG] F0CD3003 parsing: interval=\(interval), ago=\(ago), battery=\(battery)")
+                    }
+                    let radiationRateRaw = readUInt32LE()  // Bytes 7-10
+                    let radiationTotal = readUInt64LE()    // Bytes 11-18
+                    let radiationDuration = readUInt64LE() // Bytes 19-26
+                    // Remaining 20 bytes are extended data, ignore for now
+
+                    // For F0CD3003, rate is stored as nSv/h (NOT multiplied by 10 like F0CD1504)
+                    let radiationRateValue = Double(radiationRateRaw)
+                    let radiationRate = Measurement(value: radiationRateValue, unit: UnitRadiationDose.nanosieverts)
+                    let radiationTotalMeasurement = Measurement(value: Double(radiationTotal), unit: UnitRadiationDose.nanosieverts)
+
+                    return AranetReading(
+                        deviceType: .aranetRadiation,
+                        name: name,
+                        version: version,
+                        temperature: nil,
+                        humidity: nil,
+                        co2: nil,
+                        pressure: nil,
+                        radiationRate: radiationRate,
+                        radiationTotal: radiationTotalMeasurement,
+                        radiationDuration: radiationDuration,
+                        radonConcentration: nil,
+                        battery: battery,
+                        status: nil,
+                        interval: interval,
+                        ago: ago
+                    )
+                }
+                else {
+                    throw AranetError.invalidData
+                }
+            }
+            // Aranet2 - first byte = 2
+            else if deviceTypeByte == 2 {
+                guard data.count >= 10 else {
+                    throw AranetError.invalidData
+                }
+
+                // Format: <HHHBHHB
+                // Total size: 10 bytes (device type + 9 bytes of data)
+                // Skip first byte (device type)
+                offset = 1
+                let interval = readUInt16LE()    // Bytes 1-2
+                let ago = readUInt16LE()         // Bytes 3-4
+                let battery = readUInt8()        // Byte 5
+                let tempRaw = readUInt16LE()     // Bytes 6-7
+                let humidity = readUInt8()        // Byte 8
+                let _ = readUInt8()              // Byte 9 - Status byte (bit-packed humidity/temperature status, not currently parsed)
+
+                let temperatureValue = Double(tempRaw) / 20.0
+                let temperature = Measurement(value: temperatureValue, unit: UnitTemperature.celsius)
+
+                return AranetReading(
+                    deviceType: .aranet2,
+                    name: name,
+                    version: version,
+                    temperature: temperature,
+                    humidity: humidity,
+                    co2: nil,
+                    pressure: nil,
+                    radiationRate: nil,
+                    radiationTotal: nil,
+                    radiationDuration: nil,
+                    radonConcentration: nil,
+                    battery: battery,
+                    status: nil,
+                    interval: interval,
+                    ago: ago
+                )
+            }
+            // Aranet Radon - first byte = 3 (not fully implemented yet)
+            else if deviceTypeByte == 3 {
+                throw AranetError.invalidData // Radon parsing not yet implemented
+            }
+            else {
+                throw AranetError.invalidData
+            }
         }
+        // Aranet4 format (F0CD3001 detailed or F0CD1503 basic)
+        else {
+            guard data.count >= 7 else {
+                throw AranetError.invalidData
+            }
 
-        return AranetReading(
-            deviceType: .aranet4,
-            name: name,
-            version: version,
-            temperature: temperature,
-            humidity: humidity,
-            co2: co2,
-            pressure: pressure,
-            battery: battery,
-            status: status,
-            interval: interval,
-            ago: ago
-        )
+            offset = 0
+            let co2 = readUInt16LE()
+            let tempRaw = readUInt16LE()
+            let pressureRaw = readUInt16LE()
+            let humidity = readUInt8()
+            let battery = readUInt8()
+            let statusRaw = readUInt8()
+
+            let temperatureValue = Double(tempRaw) / 20.0
+            let temperature = Measurement(value: temperatureValue, unit: UnitTemperature.celsius)
+
+            let pressureValue = Double(pressureRaw) / 10.0
+            let pressure = Measurement(value: pressureValue, unit: UnitPressure.hectopascals)
+
+            let status = AranetStatusColor(rawValue: statusRaw)
+
+            var interval: UInt16?
+            var ago: UInt16?
+
+            if data.count >= 11 {
+                interval = readUInt16LE()
+                ago = readUInt16LE()
+            }
+
+            return AranetReading(
+                deviceType: .aranet4,
+                name: name,
+                version: version,
+                temperature: temperature,
+                humidity: humidity,
+                co2: co2,
+                pressure: pressure,
+                battery: battery,
+                status: status,
+                interval: interval,
+                ago: ago
+            )
+        }
     }
 }

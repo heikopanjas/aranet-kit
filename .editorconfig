@@ -1,0 +1,39 @@
+# EditorConfig for Swift projects
+# https://editorconfig.org
+
+root = true
+
+# All files - baseline settings
+[*]
+end_of_line = lf
+insert_final_newline = true
+trim_trailing_whitespace = true
+
+# Swift source files
+[*.swift]
+charset = utf-8
+
+# Swift package manifest
+[Package.swift]
+charset = utf-8
+
+# Xcode project files
+[*.{pbxproj,xcscheme,xcworkspacedata}]
+charset = utf-8
+
+# Property list files
+[*.{plist,entitlements}]
+charset = utf-8
+
+# Markdown documentation
+[*.md]
+charset = utf-8
+trim_trailing_whitespace = false
+
+# YAML configuration files
+[*.{yml,yaml}]
+charset = utf-8
+
+# JSON configuration files
+[*.json]
+charset = utf-8
