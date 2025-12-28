@@ -995,7 +995,9 @@ extension AranetClient: CBPeripheralDelegate {
                     let radiationDuration = readUInt64LE() // Read bytes 19-26 (value[6] from Python)
 
                     // radiation_rate is stored as nSv/h * 10, divide by 10 to get nSv/h
-                    let radiationRate = Double(radiationRateRaw) / 10.0
+                    let radiationRateValue = Double(radiationRateRaw) / 10.0
+                    let radiationRate = Measurement(value: radiationRateValue, unit: UnitRadiationDose.nanosieverts)
+                    let radiationTotalMeasurement = Measurement(value: Double(radiationTotal), unit: UnitRadiationDose.nanosieverts)
 
                     return AranetReading(
                         deviceType: .aranetRadiation,
@@ -1006,7 +1008,7 @@ extension AranetClient: CBPeripheralDelegate {
                         co2: nil,
                         pressure: nil,
                         radiationRate: radiationRate,
-                        radiationTotal: Double(radiationTotal),
+                        radiationTotal: radiationTotalMeasurement,
                         radiationDuration: radiationDuration,
                         radonConcentration: nil,
                         battery: battery,
@@ -1041,8 +1043,9 @@ extension AranetClient: CBPeripheralDelegate {
                     // Remaining 20 bytes are extended data, ignore for now
 
                     // For F0CD3003, rate is stored as nSv/h (NOT multiplied by 10 like F0CD1504)
-                    // Store in nSv/h (formatOutput will convert to µSv/h for display)
-                    let radiationRate = Double(radiationRateRaw)
+                    let radiationRateValue = Double(radiationRateRaw)
+                    let radiationRate = Measurement(value: radiationRateValue, unit: UnitRadiationDose.nanosieverts)
+                    let radiationTotalMeasurement = Measurement(value: Double(radiationTotal), unit: UnitRadiationDose.nanosieverts)
 
                     return AranetReading(
                         deviceType: .aranetRadiation,
@@ -1053,7 +1056,7 @@ extension AranetClient: CBPeripheralDelegate {
                         co2: nil,
                         pressure: nil,
                         radiationRate: radiationRate,
-                        radiationTotal: Double(radiationTotal),
+                        radiationTotal: radiationTotalMeasurement,
                         radiationDuration: radiationDuration,
                         radonConcentration: nil,
                         battery: battery,
@@ -1083,7 +1086,8 @@ extension AranetClient: CBPeripheralDelegate {
                 let humidity = readUInt8()        // Byte 8
                 let _ = readUInt8()              // Byte 9 - Status byte (bit-packed humidity/temperature status, not currently parsed)
 
-                let temperature = Double(tempRaw) / 20.0
+                let temperatureValue = Double(tempRaw) / 20.0
+                let temperature = Measurement(value: temperatureValue, unit: UnitTemperature.celsius)
 
                 return AranetReading(
                     deviceType: .aranet2,
@@ -1125,8 +1129,12 @@ extension AranetClient: CBPeripheralDelegate {
             let battery = readUInt8()
             let statusRaw = readUInt8()
 
-            let temperature = Double(tempRaw) / 20.0
-            let pressure = Double(pressureRaw) / 10.0
+            let temperatureValue = Double(tempRaw) / 20.0
+            let temperature = Measurement(value: temperatureValue, unit: UnitTemperature.celsius)
+
+            let pressureValue = Double(pressureRaw) / 10.0
+            let pressure = Measurement(value: pressureValue, unit: UnitPressure.hectopascals)
+
             let status = AranetStatusColor(rawValue: statusRaw)
 
             var interval: UInt16?

@@ -6,6 +6,8 @@ A Swift command-line tool for interacting with Aranet Bluetooth sensors (Aranet4
 
 - **Scan** for nearby Aranet devices
 - **Read** current sensor measurements (CO2, temperature, humidity, pressure, battery)
+- **Monitor** sensor values with automatic periodic updates
+- **Swift Foundation Units** - Type-safe measurements with automatic unit conversions
 - **Progress indicators** - Visual feedback during scanning and connecting
 - **No pairing required** - reads directly from BLE characteristics
 - Native Swift performance with CoreBluetooth
@@ -27,7 +29,7 @@ Add to your `Package.swift`:
 
 ```swift
 dependencies: [
-    .package(url: "https://github.com/heikopanjas/aranet-kit.git", from: "1.0.0")
+    .package(url: "https://github.com/heikopanjas/aranet-kit.git", from: "2.0.0")
 ]
 ```
 
@@ -165,10 +167,23 @@ Unlike many Bluetooth devices, **Aranet4 sensors do not require pairing** for ba
 ### Characteristics Used
 
 - **F0CD3001** (Detailed Current Readings) - Primary, no pairing required ✓
+- **F0CD3003** (AR2 Detailed) - For Aranet Radiation, no pairing required ✓
 - **F0CD1503** (Basic Current Readings) - Requires pairing/authentication
 - **F0CD1504** (AR2 Current Readings) - For Aranet2 devices
 
 The tool automatically selects the best available characteristic based on device type and availability.
+
+### Swift Foundation Units
+
+AranetKit uses Swift Foundation's `Measurement<Unit>` types for all physical quantities, providing:
+
+- **Type-safe measurements** with compiler-checked units
+- **Automatic unit conversions** via `.converted(to:)` method
+- **Standard Foundation units**: Temperature (°C, °F, K), Pressure (hPa, inHg, bar)
+- **Custom units for radiation**: Dose measurements (nSv, µSv, mSv, Sv)
+- **Custom units for radon**: Concentration (Bq/m³, pCi/L)
+
+All raw sensor values (percentages, ppm, time) remain as primitive types for simplicity.
 
 ## Troubleshooting
 
@@ -231,7 +246,8 @@ If scanning finds no devices:
 Sources/
 ├── AranetKit/           # Reusable library
 │   ├── AranetClient.swift   # CoreBluetooth client
-│   └── AranetTypes.swift    # Data models and types
+│   ├── AranetTypes.swift    # Data models and types
+│   └── Units.swift          # Custom measurement units
 └── AranetCli/           # CLI application
     ├── AranetCli.swift      # CLI interface
     └── ProgressSpinner.swift # Terminal UI utilities
@@ -244,7 +260,7 @@ The core Bluetooth functionality is available as a Swift package that can be imp
 ```swift
 // In your Package.swift
 dependencies: [
-    .package(url: "https://github.com/heikopanjas/aranet-kit.git", from: "1.0.0")
+    .package(url: "https://github.com/heikopanjas/aranet-kit.git", from: "2.0.0")
 ],
 targets: [
     .target(
@@ -264,8 +280,34 @@ let devices = try await client.scan(timeout: 5.0)
 // Read sensor data
 if let device = devices.first {
     let reading = try await client.readCurrentReadings(from: device)
+    
+    // Access measurements with type-safe units
     print("CO2: \(reading.co2 ?? 0) ppm")
-    print("Temperature: \(reading.temperature ?? 0)°C")
+    
+    if let temp = reading.temperature {
+        print("Temperature: \(temp.value)°C")
+        // Convert to Fahrenheit
+        let tempF = temp.converted(to: .fahrenheit)
+        print("Temperature: \(tempF.value)°F")
+    }
+    
+    if let pressure = reading.pressure {
+        print("Pressure: \(pressure.value) hPa")
+        // Convert to inches of mercury
+        let pressureInHg = pressure.converted(to: .inchesOfMercury)
+        print("Pressure: \(pressureInHg.value) inHg")
+    }
+}
+
+// Monitor sensor values continuously
+let monitorStream = await client.monitor(from: device)
+for await result in monitorStream {
+    switch result {
+    case .success(let reading):
+        print("New reading: \(reading.co2 ?? 0) ppm CO2")
+    case .failure(let error):
+        print("Error: \(error)")
+    }
 }
 ```
 

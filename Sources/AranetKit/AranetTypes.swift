@@ -100,10 +100,13 @@ public struct AranetReading: Sendable {
 
     // MARK: - Aranet2, Aranet4
 
-    /// Ambient temperature measurement in degrees Celsius (°C).
+    /// Ambient temperature measurement.
+    ///
+    /// The measurement is stored in the device's native unit (Celsius).
+    /// Use `.converted(to:)` to convert to other temperature units.
     ///
     /// Available on: Aranet2, Aranet4, Aranet Radon Plus
-    public let temperature: Double?
+    public let temperature: Measurement<UnitTemperature>?
 
     /// Relative humidity measurement as a percentage (%).
     ///
@@ -119,25 +122,33 @@ public struct AranetReading: Sendable {
     /// Available on: Aranet4 only
     public let co2: UInt16?
 
-    /// Atmospheric pressure in hectopascals (hPa).
+    /// Atmospheric pressure measurement.
+    ///
+    /// The measurement is stored in hectopascals (hPa).
+    /// Use `.converted(to:)` to convert to other pressure units.
     ///
     /// Standard sea level pressure: ~1013 hPa
     /// Available on: Aranet4, Aranet Radon Plus
-    public let pressure: Double?
+    public let pressure: Measurement<UnitPressure>?
 
     // MARK: - Aranet Radiation
 
-    /// Current radiation dose rate in nanosieverts per hour (nSv/h).
+    /// Current radiation dose rate measurement.
+    ///
+    /// The measurement is stored in nanosieverts per hour (nSv/h).
+    /// Use `.converted(to: .microsieverts)` for µSv/h display.
     ///
     /// Typical background radiation: 50-200 nSv/h (0.05-0.2 µSv/h)
     /// Available on: Aranet Radiation only
-    public let radiationRate: Double?
+    public let radiationRate: Measurement<UnitRadiationDose>?
 
-    /// Cumulative radiation dose in nanosieverts (nSv).
+    /// Cumulative radiation dose measurement.
     ///
+    /// The measurement is stored in nanosieverts (nSv).
     /// Total accumulated dose since the last counter reset.
+    ///
     /// Available on: Aranet Radiation only
-    public let radiationTotal: Double?
+    public let radiationTotal: Measurement<UnitRadiationDose>?
 
     /// Duration of radiation measurement period in seconds.
     ///
@@ -147,12 +158,15 @@ public struct AranetReading: Sendable {
 
     // MARK: - Aranet Radon
 
-    /// Radon gas concentration in becquerels per cubic meter (Bq/m³).
+    /// Radon gas concentration measurement.
+    ///
+    /// The measurement is stored in becquerels per cubic meter (Bq/m³).
+    /// Use `.converted(to: .picocuriesPerLiter)` for pCi/L display.
     ///
     /// WHO recommended action level: 100 Bq/m³
     /// EPA recommended action level: 148 Bq/m³ (4 pCi/L)
     /// Available on: Aranet Radon Plus only
-    public let radonConcentration: UInt32?
+    public let radonConcentration: Measurement<UnitRadioactivity>?
 
     // MARK: - Common
 
@@ -186,14 +200,14 @@ public struct AranetReading: Sendable {
     ///   - deviceType: Type of Aranet device
     ///   - name: Device Bluetooth name
     ///   - version: Firmware version string
-    ///   - temperature: Ambient temperature in °C
+    ///   - temperature: Ambient temperature measurement
     ///   - humidity: Relative humidity in %
     ///   - co2: CO2 concentration in ppm (Aranet4)
-    ///   - pressure: Atmospheric pressure in hPa
-    ///   - radiationRate: Dose rate in nSv/h (Aranet Radiation)
-    ///   - radiationTotal: Cumulative dose in nSv (Aranet Radiation)
+    ///   - pressure: Atmospheric pressure measurement
+    ///   - radiationRate: Dose rate measurement (Aranet Radiation)
+    ///   - radiationTotal: Cumulative dose measurement (Aranet Radiation)
     ///   - radiationDuration: Measurement duration in seconds (Aranet Radiation)
-    ///   - radonConcentration: Radon concentration in Bq/m³ (Aranet Radon Plus)
+    ///   - radonConcentration: Radon concentration measurement (Aranet Radon Plus)
     ///   - battery: Battery level in %
     ///   - status: Status indicator color
     ///   - interval: Measurement interval in seconds
@@ -202,14 +216,14 @@ public struct AranetReading: Sendable {
         deviceType: AranetDeviceType = .unknown,
         name: String = "",
         version: String = "",
-        temperature: Double? = nil,
+        temperature: Measurement<UnitTemperature>? = nil,
         humidity: UInt8? = nil,
         co2: UInt16? = nil,
-        pressure: Double? = nil,
-        radiationRate: Double? = nil,
-        radiationTotal: Double? = nil,
+        pressure: Measurement<UnitPressure>? = nil,
+        radiationRate: Measurement<UnitRadiationDose>? = nil,
+        radiationTotal: Measurement<UnitRadiationDose>? = nil,
         radiationDuration: UInt64? = nil,
-        radonConcentration: UInt32? = nil,
+        radonConcentration: Measurement<UnitRadioactivity>? = nil,
         battery: UInt8 = 0,
         status: AranetStatusColor? = nil,
         interval: UInt16? = nil,
