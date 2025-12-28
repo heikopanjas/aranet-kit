@@ -1,26 +1,44 @@
 {
-    "configurations": [
-      {
-        "type": "lldb",
-        "request": "launch",
-        "args": [],
-        "cwd": "${workspaceFolder:aranet-kit}",
-        "name": "Debug aranetcli",
-        "target": "aranetcli",
-        "configuration": "debug",
-        "preLaunchTask": "swift: Build Debug aranetcli",
-        "program": "${workspaceFolder:aranet-kit}/.build/debug/aranetcli"
-      },
-      {
-        "type": "lldb",
-        "request": "launch",
-        "args": [],
-        "cwd": "${workspaceFolder:aranet-kit}",
-        "name": "Release aranetcli",
-        "target": "aranetcli",
-        "configuration": "release",
-        "preLaunchTask": "swift: Build Release aranetcli",
-        "program": "${workspaceFolder:aranet-kit}/.build/release/aranetcli"
-      }
-    ]
+  "configurations": [
+    {
+      "type": "swift",
+      "request": "launch",
+      "args": [],
+      "cwd": "${workspaceFolder:aranet-kit}",
+      "name": "Debug aranetcli",
+      "target": "aranetcli",
+      "configuration": "debug",
+      "preLaunchTask": "swift: Build Debug aranetcli"
+    },
+    {
+      "type": "swift",
+      "request": "launch",
+      "args": [],
+      "cwd": "${workspaceFolder:aranet-kit}",
+      "name": "Release aranetcli",
+      "target": "aranetcli",
+      "configuration": "release",
+      "preLaunchTask": "swift: Build Release aranetcli"
+    },
+    {
+      "type": "swift",
+      "request": "launch",
+      "args": [],
+      "cwd": "${workspaceFolder:aranet-kit}",
+      "name": "Debug AranetCli",
+      "target": "AranetCli",
+      "configuration": "debug",
+      "preLaunchTask": "swift: Build Debug AranetCli"
+    },
+    {
+      "type": "swift",
+      "request": "launch",
+      "args": [],
+      "cwd": "${workspaceFolder:aranet-kit}",
+      "name": "Release AranetCli",
+      "target": "AranetCli",
+      "configuration": "release",
+      "preLaunchTask": "swift: Build Release AranetCli"
+    }
+  ]
 }

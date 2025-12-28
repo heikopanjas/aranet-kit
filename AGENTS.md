@@ -1,6 +1,6 @@
 # Project Instructions for AI Coding Agents
 
-**Last updated:** 2025-12-10 17:00
+**Last updated:** 2025-12-28 15:00
 
 <!-- {mission} -->
 
@@ -307,6 +307,7 @@ AranetKit defines custom `Dimension` subclasses for radiation and radioactivity 
 Measures ionizing radiation dose with base unit nanosieverts (nSv).
 
 **Available units:**
+
 - `.nanosieverts` (nSv) - base unit, coefficient 1.0
 - `.microsieverts` (µSv) - coefficient 1000.0
 - `.millisieverts` (mSv) - coefficient 1,000,000.0
@@ -328,6 +329,7 @@ print("Total dose: \(totalMsv.value) mSv")
 ```
 
 **Typical values:**
+
 - Background radiation: 50-200 nSv/h (0.05-0.2 µSv/h)
 - Annual limit (public): ~100 µSv
 
@@ -336,6 +338,7 @@ print("Total dose: \(totalMsv.value) mSv")
 Measures radon gas concentration with base unit becquerels per cubic meter (Bq/m³).
 
 **Available units:**
+
 - `.becquerelsPerCubicMeter` (Bq/m³) - base unit, SI standard
 - `.picocuriesPerLiter` (pCi/L) - coefficient 37.0, common in USA
 
@@ -351,6 +354,7 @@ print("Radon: \(radonPci.value) pCi/L")
 ```
 
 **Reference levels:**
+
 - WHO action level: 100 Bq/m³
 - EPA action level: 148 Bq/m³ (4 pCi/L)
 
@@ -1150,6 +1154,20 @@ After making ANY code changes:
 - **Files updated**: AGENTS.md references to project name, executable name, and directory structure
 - **Consistency**: Package name `AranetCli`, executable `aranetcli`, directory `Sources/aranetcli/`
 - **Reasoning**: Standardizing on `aranetcli` (CLI = Command Line Interface) provides clearer naming and matches the actual build artifacts and source structure
+
+### 2025-12-28 15:00 (Package Structure - Executable Hidden from Dependencies)
+
+- **Updated Package.swift structure**: Removed executable from products array, keeping only AranetKit library exposed
+- **Xcode visibility**: Executable hidden from "Add Package Dependencies" dialog (not in products)
+- **Binary output**: `AranetCli` (determined by target name)
+- **Local usage**: Can still build and run with `swift run AranetCli`
+- **Package structure**:
+  - Package name: `AranetCli`
+  - Library product: `AranetKit` (public, for dependencies)
+  - Library target: `AranetKit` in `Sources/AranetKit/`
+  - Executable target: `AranetCli` in `Sources/AranetCli/`
+  - Binary output: `AranetCli`
+- **Reasoning**: Standard pattern for packages providing both library and CLI tool - expose only the library as a product. This prevents the executable from appearing in Xcode's "Add Package Dependencies" dialog while keeping it available for local development.
 
 ### 2025-10-05
 
