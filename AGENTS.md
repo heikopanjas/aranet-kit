@@ -1,6 +1,6 @@
 # Project Instructions for AI Coding Agents
 
-**Last updated:** 2026-03-14 13:00
+**Last updated:** 2026-03-14 14:00
 
 <!-- {mission} -->
 
@@ -145,6 +145,32 @@ if !isEnabled { }        // Wrong
 ```
 
 **Rationale**: Explicit comparisons make code intent clearer and improve readability, especially for developers from other language backgrounds.
+
+### DRY Principle (Don't Repeat Yourself)
+
+**Eliminate duplication ruthlessly.** When the same logic, pattern, or sequence appears in more than one place, extract it into a shared helper (function, computed property, or extension method).
+
+**What to extract:**
+
+- Identical or near-identical code blocks across commands or methods
+- Repeated multi-line patterns (e.g. cleanup sequences, error formatting)
+- Constant sets or lists used in multiple comparisons
+- Formatting logic reused across switch cases or device types
+
+**How to extract:**
+
+- **Shared logic across CLI commands**: File-private free functions or extensions in AranetCli.swift
+- **Repeated UUID/constant sets**: Static properties on the relevant type (e.g. `AranetUUID.readingCharacteristics`)
+- **Repeated formatting**: Private computed properties on the data type
+- **Near-duplicate branches**: Parameterize the difference (e.g. a divisor or flag), share the rest
+
+**When NOT to extract:**
+
+- Superficial similarity where the intent differs (coincidental duplication)
+- One-time code that merely looks similar but serves distinct purposes
+- Extraction that would obscure the code's intent or add unnecessary abstraction
+
+**Rationale**: A single source of truth for each piece of knowledge reduces bugs from inconsistent updates and keeps the codebase smaller and easier to maintain.
 
 ### Guard Statements
 
@@ -885,6 +911,30 @@ After making ANY code changes:
 ---
 
 ## Recent Updates & Decisions
+
+### 2026-03-14 14:00 (DRY Refactoring - Code Deduplication)
+
+- **Added DRY principle** to Swift Coding Conventions in AGENTS.md
+- **AranetClient.swift refactoring**:
+  - Added `readingCharacteristicPriority` (ordered array) and `readingCharacteristics` (derived set) to `AranetUUID`
+  - Added `failOperation(_:with:disconnect:)` helper -- replaces 6 identical cleanup sequences
+  - Consolidated 4 characteristic discovery `else if` blocks into one `readingCharacteristics.contains()` check
+  - Replaced 4-branch priority selection chain with `readingCharacteristicPriority.first(where:)`
+  - Unified duplicate 28-byte and 48-byte radiation parsing into single parameterized block (rateDivisor)
+  - Replaced 2 inline four-UUID disjunctions with `readingCharacteristics.contains()`
+  - Fixed unused variable warning in `failAllOperations`
+  - Removed redundant guard (`data.count == 28` already guarantees `>= 28`)
+- **AranetCli.swift refactoring**:
+  - Added `[AranetDevice].match(queries:)` extension -- eliminates duplicate device matching in Read and Monitor
+  - Added `scanAndMatchDevices(queries:verbose:)` -- eliminates ~30 lines of duplicate scan/spinner/match boilerplate
+  - Added `printError(_:device:)` -- eliminates duplicate AranetError formatting
+  - Extracted 9 computed properties from `formatOutput()` (co2Line, temperatureLine, humidityLine, pressureLine, batteryLine, statusLine, ageLine, radonLine, radiationLines)
+  - Simplified `formatOutput()` switch cases to single-line property concatenations
+  - Refactored `Read.run()` from 65 lines to 40 lines using shared helpers
+  - Refactored `Monitor.run()` from 65 lines to 35 lines using shared helpers
+- **Net reduction**: ~120 lines removed across both files
+- **Files changed**: AranetClient.swift, AranetCli.swift, AGENTS.md
+- **Reasoning**: Multiple exact and near-duplicate code blocks violated DRY, risking inconsistent updates and inflating maintenance burden. Shared helpers provide single sources of truth for device matching, error display, operation cleanup, and characteristic priority.
 
 ### 2026-03-14 13:30 (Multi-Device Monitor Command)
 
