@@ -121,7 +121,7 @@ extension AranetReading {
 
             case .aranetRadiation:
                 output += radiationLines
-                output += batteryLine + ageLine
+                output += batteryLine + statusLine + ageLine
 
             case .aranetRadon:
                 output += radonLine + temperatureLine + humidityLine + pressureLine
@@ -194,7 +194,7 @@ private func scanAndMatchDevices(
 
     let discoveredDevices: [AranetDevice]
     do {
-        discoveredDevices = try await client.scan(timeout: 10.0)
+        discoveredDevices = try await client.scan(timeout: 15.0)
     }
     catch {
         if verbose == false {
@@ -232,7 +232,7 @@ struct AranetCli: AsyncParsableCommand {
     static let configuration = CommandConfiguration(
         commandName: "aranetcli",
         abstract: "Command-line tool for Aranet Bluetooth sensors",
-        version: "3.1.0",
+        version: "3.2.0",
         subcommands: [Scan.self, Read.self, Monitor.self]
     )
 }
@@ -246,7 +246,7 @@ extension AranetCli {
         )
 
         @Option(name: .shortAndLong, help: "Scan timeout in seconds")
-        var timeout: Double = 10.0
+        var timeout: Double = 15.0
 
         @Flag(name: .shortAndLong, help: "Show verbose output")
         var verbose: Bool = false

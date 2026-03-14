@@ -268,11 +268,11 @@ public class AranetClient: NSObject, @unchecked Sendable {
 
     /// Scans for nearby Aranet Bluetooth devices.
     ///
-    /// - Parameter timeout: Maximum time to scan in seconds. Default is 10.0 seconds.
+    /// - Parameter timeout: Maximum time to scan in seconds. Default is 15.0 seconds.
     /// - Returns: Array of discovered ``AranetDevice`` values.
     /// - Throws: ``AranetError`` if Bluetooth is unavailable or unauthorized.
     @MainActor
-    public func scan(timeout: TimeInterval = 10.0) async throws -> [AranetDevice] {
+    public func scan(timeout: TimeInterval = 15.0) async throws -> [AranetDevice] {
         try await waitForBluetoothReady()
 
         discoveredPeripherals.removeAll()
@@ -828,6 +828,60 @@ extension AranetClient: CBPeripheralDelegate {
         }
     }
 
+    // MARK: - Debug Helpers
+
+    private func printHexDump(_ data: Data, title: String, fields: [(range: String, description: String)]) {
+        print("[DEBUG] === \(title) (\(data.count) bytes) ===")
+
+        for field in fields {
+            let parts = field.range.split(separator: "-")
+            guard let start = Int(parts[0]) else { continue }
+            let end = parts.count > 1 ? Int(parts[1])! : start
+
+            guard start < data.count else { continue }
+            let clampedEnd = min(end, data.count - 1)
+
+            let bytes = data[start...clampedEnd]
+            let hex = bytes.map { String(format: "%02X", $0) }.joined(separator: " ")
+
+            var leValue: UInt64 = 0
+            for (i, byte) in bytes.enumerated() {
+                leValue |= UInt64(byte) << (i * 8)
+            }
+
+            let range = field.range.padding(toLength: 5, withPad: " ", startingAt: 0)
+            let hexVal = "\(hex) = \(leValue)"
+            print("[DEBUG] \(range)  \(hexVal.padding(toLength: 36, withPad: " ", startingAt: 0)) \(field.description)")
+        }
+
+        print("[DEBUG] ===")
+    }
+
+    private static let aranet4Fields: [(range: String, description: String)] = [
+        ("0-1", "CO2 (UInt16 LE, ppm)"),
+        ("2-3", "Temperature (UInt16 LE, raw/20)"),
+        ("4-5", "Pressure (UInt16 LE, raw/10 hPa)"),
+        ("6", "Humidity (UInt8, %)"),
+        ("7", "Battery (UInt8, %)"),
+        ("8", "Status (0=Err, 1=G, 2=Y, 3=R)"),
+        ("9-10", "Interval (UInt16 LE, sec)"),
+        ("11-12", "Ago (UInt16 LE, sec)"),
+    ]
+
+    private static let radiationFields: [(range: String, description: String)] = [
+        ("0-1", "Device type + H"),
+        ("2-3", "Interval (UInt16 LE, sec)"),
+        ("4-5", "Ago (UInt16 LE, sec)"),
+        ("6", "Battery (UInt8, %)"),
+        ("7-10", "Rate (UInt32 LE, nSv/h)"),
+        ("11-18", "Total (UInt64 LE, nSv)"),
+        ("19-26", "Duration (UInt64 LE, sec)"),
+        ("27", "Status (0x05=G, 0x0A=Y, 0x0B=R)"),
+        ("28-35", "Total dose (UInt64 LE, uSv)"),
+        ("36-43", "Realtime duration (UInt64 LE, sec, 60s granularity)"),
+        ("44-47", "Reserved (zero)"),
+    ]
+
     // MARK: - Data Parsing
 
     private func parseReading(data: Data, name: String, version: String, characteristicUUID: CBUUID?) throws -> AranetReading {
@@ -881,6 +935,10 @@ extension AranetClient: CBPeripheralDelegate {
                     throw AranetError.invalidData
                 }
 
+                if verbose == true {
+                    printHexDump(data, title: "Aranet Radiation", fields: Self.radiationFields)
+                }
+
                 offset = 2
                 let interval = readUInt16LE()
                 let ago = readUInt16LE()
@@ -893,6 +951,13 @@ extension AranetClient: CBPeripheralDelegate {
                 let radiationRateRaw = readUInt32LE()
                 let radiationTotal = readUInt64LE()
                 let radiationDuration = readUInt64LE()
+
+                // Byte 27: status display color (different encoding than Aranet4)
+                let statusByte = readUInt8()
+                let status = AranetStatusColor.fromRadiationByte(statusByte)
+                if verbose == true {
+                    print("[DEBUG] Radiation status byte: 0x\(String(format: "%02X", statusByte)) -> \(status?.name ?? "unknown")")
+                }
 
                 let radiationRate = Measurement(
                     value: Double(radiationRateRaw) / rateDivisor,
@@ -911,6 +976,7 @@ extension AranetClient: CBPeripheralDelegate {
                     radiationTotal: radiationTotalMeasurement,
                     radiationDuration: radiationDuration,
                     battery: battery,
+                    status: status,
                     interval: interval,
                     ago: ago
                 )
@@ -955,6 +1021,10 @@ extension AranetClient: CBPeripheralDelegate {
         else {
             guard data.count >= 7 else {
                 throw AranetError.invalidData
+            }
+
+            if verbose == true {
+                printHexDump(data, title: "Aranet4", fields: Self.aranet4Fields)
             }
 
             offset = 0

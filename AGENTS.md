@@ -1,6 +1,6 @@
 # Project Instructions for AI Coding Agents
 
-**Last updated:** 2026-03-14 14:00
+**Last updated:** 2026-03-14 15:00
 
 <!-- {mission} -->
 
@@ -569,8 +569,13 @@ Byte 6:     Battery (UInt8) - battery level percentage (0-100) (value[3] in Pyth
 Bytes 7-10: Rate (UInt32 LE) - radiation dose rate in nSv/h (NOT multiplied by 10) (value[4] in Python)
 Bytes 11-18: Total (UInt64 LE) - cumulative radiation dose in nSv (value[5] in Python)
 Bytes 19-26: Duration (UInt64 LE) - measurement duration in seconds (value[6] in Python)
-Byte 27:    Unknown/padding (UInt8) - (value[7] in Python)
-Bytes 28-47: Extended data (20 bytes, currently unused)
+Byte 27:     Status (UInt8) - status display color (value[7] in Python, unused there)
+             Encoding differs from Aranet4: 0x05=Green, 0x0A=Yellow, 0x0B=Red
+Bytes 28-35: Total dose (UInt64 LE) - cumulative dose in microsieverts (uSv)
+             Equals floor(total_nSv / 1000), lower-resolution duplicate of bytes 11-18
+Bytes 36-43: Realtime duration (UInt64 LE) - elapsed time in seconds, 60s granularity
+             Equals floor((duration + ago) / 60) * 60, continuously updated unlike bytes 19-26
+Bytes 44-47: Reserved (zero)
 ```
 
 **Note:** The Python struct format `<HHHBIQQB` unpacks bytes 0-27, where the first `H` (bytes 0-1) includes the device type byte. When parsing in Swift, skip bytes 0-1 (set offset = 2), then read interval from bytes 2-3 and ago from bytes 4-5.
@@ -581,6 +586,8 @@ Bytes 28-47: Extended data (20 bytes, currently unused)
 - **Data model**: `radiationRate` in `AranetReading` is stored in nSv/h; `formatOutput()` converts to µSv/h for display
 - **Duration**: Represents total time the sensor has been measuring since last reset (typically 8+ days for long-running sensors)
 - **Total dose**: Cumulative dose since last counter reset, stored in nanosieverts (nSv)
+- **Status**: Byte 27 encodes the status display color using a different scheme than Aranet4 (0x05=Green, 0x0A=Yellow, 0x0B=Red). The Python library reads this byte but does not use it.
+- **Extended data (bytes 28-47)**: Contains lower-resolution duplicates -- total dose in µSv (bytes 28-35) and a real-time duration counter with 60-second granularity (bytes 36-43). Bytes 44-47 are reserved (zero). The Python library ignores all 20 bytes.
 
 **Comparison with F0CD1504:**
 
@@ -868,7 +875,7 @@ The current version is defined in `Sources/AranetCli/AranetCli.swift` in the `Co
 static let configuration = CommandConfiguration(
     commandName: "aranetcli",
     abstract: "Command-line tool for Aranet Bluetooth sensors",
-    version: "3.1.0",  // <-- Update this version
+    version: "3.2.0",  // <-- Update this version
     subcommands: [Scan.self, Read.self, Monitor.self]
 )
 ```
@@ -911,6 +918,26 @@ After making ANY code changes:
 ---
 
 ## Recent Updates & Decisions
+
+### 2026-03-14 15:00 (Aranet Radiation Status + Extended Data Discovery)
+
+- **Discovery 1 - Status (byte 27)**: Contains the status display color for Aranet Radiation devices
+  - Encoding differs from Aranet4 (0/1/2/3): Radiation uses 0x05=Green, 0x0A=Yellow, 0x0B=Red
+  - The Python reference library reads this byte via struct format but silently discards it
+- **Discovery 2 - Extended data (bytes 28-47)**: Fully decoded via empirical analysis (3 readings)
+  - Bytes 28-35 (UInt64 LE): Total dose in microsieverts (µSv) = floor(total_nSv / 1000)
+  - Bytes 36-43 (UInt64 LE): Real-time duration counter in seconds, 60s granularity = floor((duration + ago) / 60) * 60
+  - Bytes 44-47: Reserved (zero)
+  - The Python library ignores all 20 bytes of extended data
+- **Implementation**:
+  - Added `AranetStatusColor.fromRadiationByte(_:)` static factory method for radiation-specific mapping
+  - Radiation parsing now reads byte 27 and maps it to `AranetStatusColor`
+  - Status is included in `AranetReading` and displayed in CLI output for radiation devices
+  - Refactored hex dump into shared `printHexDump(_:title:fields:)` with per-device field tables
+  - Added Aranet4 hex dump support using the same shared helper
+- **Version bump**: 3.1.0 to 3.2.0 (MINOR - new feature, backward compatible)
+- **Files changed**: AranetTypes.swift, AranetClient.swift, AranetCli.swift, AGENTS.md
+- **Reasoning**: Aranet Radiation devices transmit status and extended data that neither the Python library nor our implementation was parsing. Confirmed via empirical testing with 3 consecutive readings from device 30F9A. The extended data (bytes 28-47) contains lower-resolution duplicates of total dose and duration -- not needed for our implementation but now fully documented.
 
 ### 2026-03-14 14:00 (DRY Refactoring - Code Deduplication)
 
