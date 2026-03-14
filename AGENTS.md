@@ -1,6 +1,6 @@
 # Project Instructions for AI Coding Agents
 
-**Last updated:** 2025-12-28 15:00
+**Last updated:** 2026-03-14 13:00
 
 <!-- {mission} -->
 
@@ -192,9 +192,9 @@ guard let data = data,
 ```swift
 // Service: Stateless data fetching
 public class AranetClient {
-    func readCurrentReadings(from deviceId: String, verbose: Bool) async throws -> AranetReading {
-        // Bluetooth communication
-    }
+    func scan(timeout: TimeInterval) async throws -> [AranetDevice]
+    func readCurrentReadings(from device: AranetDevice) async throws -> AranetReading
+    func monitor(from device: AranetDevice) -> AsyncStream<Result<AranetReading, Error>>
 }
 
 // CLI: Command handling and presentation
@@ -202,6 +202,18 @@ public class AranetClient {
 struct AranetCLI: AsyncParsableCommand {
     @Command var read: ReadCommand
     @Command var scan: ScanCommand
+}
+```
+
+### Public API Surface
+
+The library's public API uses only value types (`AranetDevice`, `AranetReading`). CoreBluetooth is fully encapsulated inside `AranetClient` -- consumers never need to `import CoreBluetooth`.
+
+```swift
+// AranetDevice abstracts CBPeripheral
+public struct AranetDevice: Identifiable, Hashable, Sendable {
+    public let id: UUID
+    public let name: String
 }
 ```
 
@@ -215,6 +227,10 @@ public class AranetClient: NSObject, @unchecked Sendable {
     // Bluetooth communication on main actor
 }
 ```
+
+### Concurrent Read Isolation
+
+Each read operation gets its own `ReadOperation` instance keyed by peripheral UUID in `activeOperations: [UUID: ReadOperation]`. This prevents cross-device state corruption when reading from multiple peripherals simultaneously.
 
 ### Data Models
 
@@ -826,7 +842,7 @@ The current version is defined in `Sources/AranetCli/AranetCli.swift` in the `Co
 static let configuration = CommandConfiguration(
     commandName: "aranetcli",
     abstract: "Command-line tool for Aranet Bluetooth sensors",
-    version: "1.0.0",  // <-- Update this version
+    version: "3.1.0",  // <-- Update this version
     subcommands: [Scan.self, Read.self, Monitor.self]
 )
 ```
@@ -869,6 +885,77 @@ After making ANY code changes:
 ---
 
 ## Recent Updates & Decisions
+
+### 2026-03-14 13:30 (Multi-Device Monitor Command)
+
+- **New feature**: `monitor` command now accepts multiple device arguments
+- **Usage**: `aranetcli monitor 228EB 30F9A` monitors both devices concurrently
+- **Implementation**:
+  - Changed `@Argument var device: String` to `@Argument var devices: [String]`
+  - Single scan, match all requested devices, warn about not-found devices
+  - Concurrent monitoring via `withThrowingTaskGroup` -- one task per device stream
+  - Readings from all devices interleave in the terminal as they arrive
+  - If any stream errors, the group cancels all others and exits
+  - Error messages include device name for identification
+- **Backward compatible**: Single-device usage unchanged (`aranetcli monitor 228EB`)
+- **Files changed**: AranetCli.swift
+- **Reasoning**: Mirrors the multi-device read command pattern. Enables monitoring all sensors from a single terminal session.
+
+### 2026-03-14 13:00 (Multi-Device Read Command)
+
+- **New feature**: `read` command now accepts multiple device arguments
+- **Version bump**: 3.0.0 to 3.1.0 (MINOR - new feature, backward compatible)
+- **Usage**: `aranetcli read 228EB 30F9A` reads from both devices concurrently
+- **Implementation**:
+  - Changed `@Argument var device: String` to `@Argument var devices: [String]`
+  - Single scan, then match all requested devices against results
+  - Concurrent reads via `withTaskGroup` leveraging per-operation state isolation
+  - Reports not-found devices after printing successful readings
+  - Adaptive spinner messages for single vs multiple devices
+- **Backward compatible**: Single-device usage unchanged (`aranetcli read 228EB`)
+- **Error handling**: Partial success supported -- prints results for devices that succeed, reports errors for failures, exits with failure if any device had errors
+- **Files changed**: AranetCli.swift
+- **Reasoning**: The library already supports concurrent reads via `ReadOperation` isolation. Exposing this at the CLI level enables reading all sensors in a single invocation, reducing total time from N sequential scans to one scan + concurrent reads.
+
+### 2026-03-14 12:00 (AranetDevice Abstraction and Concurrent Read Support - BREAKING CHANGE)
+
+- **Major refactoring**: Replaced `CBPeripheral` in all public APIs with new `AranetDevice` value type
+- **Breaking change**: Version bumped from 2.0.0 to 3.0.0 (MAJOR)
+- **New type: `AranetDevice`** (AranetTypes.swift):
+  - Public struct with `id: UUID` and `name: String` (non-optional)
+  - Conforms to `Identifiable`, `Hashable`, `Sendable`
+  - Abstracts CoreBluetooth so consumers never need to `import CoreBluetooth`
+  - Instances created by `scan()`, passed to `readCurrentReadings(from:)` and `monitor(from:)`
+- **Public API changes** (AranetClient.swift):
+  - `scan(timeout:)` now returns `[AranetDevice]` instead of `[CBPeripheral]`
+  - `readCurrentReadings(from:)` now takes `AranetDevice` instead of `CBPeripheral`
+  - `monitor(from:)` now takes `AranetDevice` instead of `CBPeripheral`
+  - Added explicit `@MainActor` annotations on `scan()` and `readCurrentReadings(from:)`
+- **Concurrent read support** (AranetClient.swift):
+  - New `ReadOperation` class encapsulates all per-read mutable state
+  - `activeOperations: [UUID: ReadOperation]` dictionary replaces single-device instance properties
+  - `knownPeripherals: [UUID: CBPeripheral]` maps AranetDevice IDs to CBPeripherals internally
+  - `disconnect(_:)` now takes explicit peripheral parameter
+  - New `failAllOperations(with:)` helper for Bluetooth state errors
+  - New `completeReading(for:)` method takes a `ReadOperation` parameter
+  - All CBPeripheralDelegate callbacks look up the correct `ReadOperation` by peripheral ID
+  - Enables safe concurrent reads from multiple devices without state corruption
+- **CLI changes** (AranetCli.swift):
+  - Updated all commands to use `AranetDevice` instead of `CBPeripheral`
+  - `device.name` is no longer optional (was `peripheral.name?`)
+  - `device.id` replaces `peripheral.identifier`
+  - Renamed local variable `peripheral` to `foundDevice` for clarity
+- **Code cleanup**:
+  - Removed verbose inline byte-format comments from parsing code (documented in AGENTS.md)
+  - Removed explicit `nil` parameters from `AranetReading` init calls (uses defaults)
+  - Removed redundant comments throughout the codebase
+  - Streamlined DocC documentation comments
+- **VSCode launch config** (.vscode/launch.json):
+  - Changed debugger type from "swift" to "lldb"
+  - Added explicit `program` paths for debug and release builds
+- **Migration impact**: External code must replace `CBPeripheral` with `AranetDevice`, use `.id` instead of `.identifier`, and `.name` is now non-optional `String`
+- **Files changed**: AranetTypes.swift, AranetClient.swift, AranetCli.swift, .vscode/launch.json
+- **Reasoning**: Exposing `CBPeripheral` in the public API forced consumers to import CoreBluetooth, leaked framework internals, and prevented concurrent multi-device reads due to shared mutable state. The new `AranetDevice` value type provides a clean, Sendable-safe API surface while per-operation state isolation enables concurrent monitoring of multiple devices.
 
 ### 2025-12-10 17:00 (Swift Foundation Units API - BREAKING CHANGE)
 

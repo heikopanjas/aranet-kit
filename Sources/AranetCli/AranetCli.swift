@@ -141,7 +141,7 @@ struct AranetCli: AsyncParsableCommand {
     static let configuration = CommandConfiguration(
         commandName: "aranetcli",
         abstract: "Command-line tool for Aranet Bluetooth sensors",
-        version: "2.0.0",
+        version: "3.1.0",
         subcommands: [Scan.self, Read.self, Monitor.self]
     )
 }
@@ -185,7 +185,7 @@ extension AranetCli {
                 else {
                     print("Found \(devices.count) device(s):\n")
                     for (index, device) in devices.enumerated() {
-                        print("\(index + 1). \(device.name ?? "Unknown") (\(device.identifier.uuidString))")
+                        print("\(index + 1). \(device.name) (\(device.id.uuidString))")
                     }
                 }
             }
@@ -205,66 +205,126 @@ extension AranetCli {
 extension AranetCli {
     struct Read: AsyncParsableCommand {
         static let configuration = CommandConfiguration(
-            abstract: "Read current sensor values from an Aranet device"
+            abstract: "Read current sensor values from one or more Aranet devices"
         )
 
-        @Argument(help: "Device UUID or name")
-        var device: String
+        @Argument(help: "Device UUID(s) or name(s) to read from")
+        var devices: [String]
 
         @Flag(name: .shortAndLong, help: "Show verbose output")
         var verbose: Bool = false
 
         mutating func run() async throws {
-            let scanSpinner = await ProgressSpinner(message: "Scanning for device '\(device)'...")
+            let scanLabel = devices.count == 1
+                ? "Scanning for device '\(devices[0])'..."
+                : "Scanning for \(devices.count) devices..."
+            let scanSpinner = await ProgressSpinner(message: scanLabel)
 
             if verbose == false {
                 await scanSpinner.start()
             }
             else {
-                print("Scanning for device '\(device)'...")
+                print(scanLabel)
             }
 
             do {
                 let client = AranetClient()
                 client.verbose = verbose
-                let devices = try await client.scan(timeout: 10.0)
+                let discoveredDevices = try await client.scan(timeout: 10.0)
 
-                guard
-                    let peripheral = devices.first(where: {
-                        $0.identifier.uuidString.lowercased() == device.lowercased()
-                            || $0.name?.lowercased().contains(device.lowercased()) == true
-                    })
-                else {
-                    if verbose == false {
-                        await scanSpinner.fail(message: "Device not found")
+                var matched: [AranetDevice] = []
+                var notFound: [String] = []
+
+                for query in devices {
+                    let queryLower = query.lowercased()
+                    if let found = discoveredDevices.first(where: {
+                        $0.id.uuidString.lowercased() == queryLower
+                            || $0.name.lowercased().contains(queryLower)
+                    }) {
+                        if matched.contains(where: { $0.id == found.id }) == false {
+                            matched.append(found)
+                        }
                     }
-                    print("Error: Device not found")
+                    else {
+                        notFound.append(query)
+                    }
+                }
+
+                if matched.isEmpty {
+                    if verbose == false {
+                        await scanSpinner.fail(message: "No devices found")
+                    }
+                    print("Error: No matching devices found")
                     throw ExitCode.failure
                 }
 
+                let foundLabel = matched.map(\.name).joined(separator: ", ")
                 if verbose == false {
-                    await scanSpinner.succeed(message: "Found \(peripheral.name ?? "device")")
+                    await scanSpinner.succeed(message: "Found \(foundLabel)")
                 }
 
-                let connectSpinner = await ProgressSpinner(message: "Connecting to \(peripheral.name ?? "device")...")
+                let readLabel = matched.count == 1
+                    ? "Reading from \(matched[0].name)..."
+                    : "Reading from \(matched.count) devices..."
+                let readSpinner = await ProgressSpinner(message: readLabel)
                 if verbose == false {
-                    await connectSpinner.start()
+                    await readSpinner.start()
                 }
                 else {
-                    print("Connecting to \(peripheral.name ?? "device")...")
+                    print(readLabel)
                 }
 
-                if verbose == true {
-                    print("[DEBUG] Starting read operation...")
-                }
+                let readings: [(AranetDevice, Result<AranetReading, Error>)] = await withTaskGroup(
+                    of: (AranetDevice, Result<AranetReading, Error>).self,
+                    returning: [(AranetDevice, Result<AranetReading, Error>)].self
+                ) { group in
+                    for device in matched {
+                        group.addTask {
+                            do {
+                                let reading = try await client.readCurrentReadings(from: device)
+                                return (device, .success(reading))
+                            }
+                            catch {
+                                return (device, .failure(error))
+                            }
+                        }
+                    }
 
-                let reading = try await client.readCurrentReadings(from: peripheral)
+                    var results: [(AranetDevice, Result<AranetReading, Error>)] = []
+                    for await result in group {
+                        results.append(result)
+                    }
+                    return results
+                }
 
                 if verbose == false {
-                    await connectSpinner.succeed(message: "Connected to \(peripheral.name ?? "device")")
+                    await readSpinner.succeed(message: "Read complete")
                 }
 
-                print(reading.formatOutput())
+                var hadError = false
+                for (device, result) in readings {
+                    switch result {
+                        case .success(let reading):
+                            print(reading.formatOutput())
+                        case .failure(let error):
+                            hadError = true
+                            if let aranetError = error as? AranetError {
+                                print("Error reading \(device.name): \(aranetError.description)")
+                            }
+                            else {
+                                print("Error reading \(device.name): \(error.localizedDescription)")
+                            }
+                    }
+                }
+
+                for name in notFound {
+                    hadError = true
+                    print("Error: Device '\(name)' not found")
+                }
+
+                if hadError == true {
+                    throw ExitCode.failure
+                }
             }
             catch let error as AranetError {
                 print("Error: \(error.description)")
@@ -279,69 +339,97 @@ extension AranetCli {
 extension AranetCli {
     struct Monitor: AsyncParsableCommand {
         static let configuration = CommandConfiguration(
-            abstract: "Monitor sensor values from an Aranet device with periodic updates"
+            abstract: "Monitor sensor values from one or more Aranet devices with periodic updates"
         )
 
-        @Argument(help: "Device UUID or name")
-        var device: String
+        @Argument(help: "Device UUID(s) or name(s) to monitor")
+        var devices: [String]
 
         @Flag(name: .shortAndLong, help: "Show verbose output")
         var verbose: Bool = false
 
         mutating func run() async throws {
-            let scanSpinner = await ProgressSpinner(message: "Scanning for device '\(device)'...")
+            let scanLabel = devices.count == 1
+                ? "Scanning for device '\(devices[0])'..."
+                : "Scanning for \(devices.count) devices..."
+            let scanSpinner = await ProgressSpinner(message: scanLabel)
 
             if verbose == false {
                 await scanSpinner.start()
             }
             else {
-                print("Scanning for device '\(device)'...")
+                print(scanLabel)
             }
 
             let client = AranetClient()
             client.verbose = verbose
 
             do {
-                let devices = try await client.scan(timeout: 10.0)
+                let discoveredDevices = try await client.scan(timeout: 10.0)
 
-                guard
-                    let peripheral = devices.first(where: {
-                        $0.identifier.uuidString.lowercased() == device.lowercased()
-                            || $0.name?.lowercased().contains(device.lowercased()) == true
-                    })
-                else {
-                    if verbose == false {
-                        await scanSpinner.fail(message: "Device not found")
+                var matched: [AranetDevice] = []
+                var notFound: [String] = []
+
+                for query in devices {
+                    let queryLower = query.lowercased()
+                    if let found = discoveredDevices.first(where: {
+                        $0.id.uuidString.lowercased() == queryLower
+                            || $0.name.lowercased().contains(queryLower)
+                    }) {
+                        if matched.contains(where: { $0.id == found.id }) == false {
+                            matched.append(found)
+                        }
                     }
-                    print("Error: Device not found")
+                    else {
+                        notFound.append(query)
+                    }
+                }
+
+                for name in notFound {
+                    print("Warning: Device '\(name)' not found")
+                }
+
+                if matched.isEmpty {
+                    if verbose == false {
+                        await scanSpinner.fail(message: "No devices found")
+                    }
+                    print("Error: No matching devices found")
                     throw ExitCode.failure
                 }
 
+                let foundLabel = matched.map(\.name).joined(separator: ", ")
                 if verbose == false {
-                    await scanSpinner.succeed(message: "Found \(peripheral.name ?? "device")")
+                    await scanSpinner.succeed(message: "Found \(foundLabel)")
                 }
 
                 print("\nMonitoring started. Press Ctrl+C to stop.\n")
 
-                // Use the monitoring stream from the library
-                let monitorStream = await client.monitor(from: peripheral)
+                try await withThrowingTaskGroup(of: Void.self) { group in
+                    for device in matched {
+                        group.addTask {
+                            let stream = await client.monitor(from: device)
+                            for await result in stream {
+                                switch result {
+                                    case .success(let reading):
+                                        print("\(Date())")
+                                        print(reading.formatOutput())
+                                        print()
 
-                for await result in monitorStream {
-                    switch result {
-                        case .success(let reading):
-                            print("\(Date())")
-                            print(reading.formatOutput())
-                            print()
-
-                        case .failure(let error):
-                            if let aranetError = error as? AranetError {
-                                print("Error: \(aranetError.description)")
+                                    case .failure(let error):
+                                        if let aranetError = error as? AranetError {
+                                            print("Error (\(device.name)): \(aranetError.description)")
+                                        }
+                                        else {
+                                            print("Error (\(device.name)): \(error.localizedDescription)")
+                                        }
+                                        throw error
+                                }
                             }
-                            else {
-                                print("Error: \(error.localizedDescription)")
-                            }
-                            throw ExitCode.failure
+                        }
                     }
+
+                    try await group.next()
+                    group.cancelAll()
                 }
 
                 print("Monitoring stopped.")
