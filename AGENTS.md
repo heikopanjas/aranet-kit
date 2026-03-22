@@ -1,6 +1,6 @@
 # Project Instructions for AI Coding Agents
 
-**Last updated:** 2026-03-14 15:00
+**Last updated:** 2026-03-22 12:00
 
 <!-- {mission} -->
 
@@ -440,9 +440,9 @@ Aranet devices use Bluetooth Low Energy (BLE) characteristics to transmit sensor
 
 #### F0CD3001 - Detailed Current Readings (13 bytes)
 
-**Characteristic UUID:** `F0CD3001-95DA-4F4B-9AC8-AA55D312AF0C`  
-**Python struct format:** `<HHHBBBHH`  
-**Total size:** 13 bytes  
+**Characteristic UUID:** `F0CD3001-95DA-4F4B-9AC8-AA55D312AF0C`
+**Python struct format:** `<HHHBBBHH`
+**Total size:** 13 bytes
 **Pairing required:** No
 
 **Byte Structure:**
@@ -479,9 +479,9 @@ let pressure = Double(pressureRaw) / 10.0
 
 #### F0CD1503 - Basic Current Readings (6 bytes)
 
-**Characteristic UUID:** `F0CD1503-95DA-4F4B-9AC8-AA55D312AF0C`  
-**Python struct format:** `<HHHBBB`  
-**Total size:** 6 bytes  
+**Characteristic UUID:** `F0CD1503-95DA-4F4B-9AC8-AA55D312AF0C`
+**Python struct format:** `<HHHBBB`
+**Total size:** 6 bytes
 **Pairing required:** Yes
 
 **Byte Structure:**
@@ -505,9 +505,9 @@ Byte 8:      Status (UInt8) - status color/alert (0=Error, 1=Green, 2=Yellow, 3=
 
 #### F0CD1504 - Current Readings (10 bytes)
 
-**Characteristic UUID:** `F0CD1504-95DA-4F4B-9AC8-AA55D312AF0C`  
-**Python struct format:** `<HHHBHHB`  
-**Total size:** 10 bytes (device type byte + 9 data bytes)  
+**Characteristic UUID:** `F0CD1504-95DA-4F4B-9AC8-AA55D312AF0C`
+**Python struct format:** `<HHHBHHB`
+**Total size:** 10 bytes (device type byte + 9 data bytes)
 **Pairing required:** Yes (for F0CD1504), No (for F0CD3003 detailed variant)
 
 **Byte Structure:**
@@ -545,9 +545,9 @@ let statusTemperature = Status(rawValue: (statusRaw & 0b1100) >> 2)
 
 #### F0CD3003 - Detailed Current Readings (48 bytes)
 
-**Characteristic UUID:** `F0CD3003-95DA-4F4B-9AC8-AA55D312AF0C`  
-**Python struct format:** `<HHHBIQQB` (for first 28 bytes)  
-**Total size:** 48 bytes  
+**Characteristic UUID:** `F0CD3003-95DA-4F4B-9AC8-AA55D312AF0C`
+**Python struct format:** `<HHHBIQQB` (for first 28 bytes)
+**Total size:** 48 bytes
 **Pairing required:** No
 
 **Byte Structure (48 bytes total):**
@@ -918,6 +918,23 @@ After making ANY code changes:
 ---
 
 ## Recent Updates & Decisions
+
+### 2026-03-22 12:00 (Publication Preparation)
+
+- **CHANGELOG backfill**: Added entries for v1.0.1 through v3.2.0 using AGENTS.md decision log
+- **GitHub Actions CI**: Created `.github/workflows/build.yml` with macOS-15 runner, Swift 6.2, build + lint jobs
+  - Uses `xcrun swift-format` (bundled with Xcode toolchain) instead of standalone swift-format
+- **Lint fixes**: Resolved all 16 swift-format lint violations across Sources/
+  - Added `// swift-format-ignore` for Dimension baseUnit() force cast pattern (Units.swift)
+  - Added `// swift-format-ignore` for CBCentralManager IUO and protocol RSSI parameter (AranetClient.swift)
+  - Fixed force unwrap in hex dump parser and ProgressSpinner timer
+  - Converted for-if to for-where clause in characteristic reading loop
+  - Removed trailing commas from array literals per swift-format config
+  - Auto-formatted indentation, spacing, and line breaks
+- **swift-format config fix**: Removed extra colon from NeverUseImplicitlyUnwrappedOptionals key
+- **README**: Updated SPM dependency version from 3.1.0 to 3.2.0 in both installation examples
+- **Files changed**: .swift-format, CHANGELOG.md, README.md, .github/workflows/build.yml, Sources/ (all files), AGENTS.md
+- **Reasoning**: Prepare package for initial public release on GitHub
 
 ### 2026-03-14 15:00 (Aranet Radiation Status + Extended Data Discovery)
 

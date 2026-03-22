@@ -78,7 +78,7 @@ public struct AranetUUID {
         characteristicCurrentReadingsDetailed,
         characteristicCurrentReadingsAR2Detailed,
         characteristicCurrentReadingsAR2,
-        characteristicCurrentReadings,
+        characteristicCurrentReadings
     ]
 
     /// Set of all characteristic UUIDs that provide sensor reading data.
@@ -203,6 +203,7 @@ private class ReadOperation {
 /// }
 /// ```
 public class AranetClient: NSObject, @unchecked Sendable {
+    // swift-format-ignore: NeverUseImplicitlyUnwrappedOptionals
     private var centralManager: CBCentralManager!
 
     // Scan state
@@ -361,7 +362,7 @@ public class AranetClient: NSObject, @unchecked Sendable {
                 // Check for encryption errors after a short delay
                 try? await Task.sleep(nanoseconds: 5_000_000_000)
                 if let op = self.activeOperations[device.id],
-                   op.continuation != nil && op.encryptionErrors > 0 && op.readingData == nil
+                    op.continuation != nil && op.encryptionErrors > 0 && op.readingData == nil
                 {
                     if self.verbose == true {
                         print("[DEBUG] Detected encryption errors with no data - pairing required")
@@ -535,7 +536,8 @@ public class AranetClient: NSObject, @unchecked Sendable {
         }
 
         do {
-            let name = operation.deviceName.isEmpty
+            let name =
+                operation.deviceName.isEmpty
                 ? (operation.peripheral.name ?? "Unknown")
                 : operation.deviceName
             let reading = try parseReading(
@@ -583,6 +585,7 @@ extension AranetClient: CBCentralManagerDelegate {
         }
     }
 
+    // swift-format-ignore: AlwaysUseLowerCamelCase
     public func centralManager(
         _ central: CBCentralManager, didDiscover peripheral: CBPeripheral, advertisementData: [String: Any], rssi RSSI: NSNumber
     ) {
@@ -708,13 +711,11 @@ extension AranetClient: CBPeripheralDelegate {
                 operation.readingCharacteristicUUID = readingChar
                 for service in peripheral.services ?? [] {
                     if let characteristics = service.characteristics {
-                        for char in characteristics {
-                            if char.uuid == readingChar {
-                                operation.pendingReads.insert(char.uuid)
-                                peripheral.readValue(for: char)
-                                if verbose == true {
-                                    print("[DEBUG] Reading from \(char.uuid)")
-                                }
+                        for char in characteristics where char.uuid == readingChar {
+                            operation.pendingReads.insert(char.uuid)
+                            peripheral.readValue(for: char)
+                            if verbose == true {
+                                print("[DEBUG] Reading from \(char.uuid)")
                             }
                         }
                     }
@@ -836,12 +837,12 @@ extension AranetClient: CBPeripheralDelegate {
         for field in fields {
             let parts = field.range.split(separator: "-")
             guard let start = Int(parts[0]) else { continue }
-            let end = parts.count > 1 ? Int(parts[1])! : start
+            let end = parts.count > 1 ? (Int(parts[1]) ?? start) : start
 
             guard start < data.count else { continue }
             let clampedEnd = min(end, data.count - 1)
 
-            let bytes = data[start...clampedEnd]
+            let bytes = data[start ... clampedEnd]
             let hex = bytes.map { String(format: "%02X", $0) }.joined(separator: " ")
 
             var leValue: UInt64 = 0
@@ -865,7 +866,7 @@ extension AranetClient: CBPeripheralDelegate {
         ("7", "Battery (UInt8, %)"),
         ("8", "Status (0=Err, 1=G, 2=Y, 3=R)"),
         ("9-10", "Interval (UInt16 LE, sec)"),
-        ("11-12", "Ago (UInt16 LE, sec)"),
+        ("11-12", "Ago (UInt16 LE, sec)")
     ]
 
     private static let radiationFields: [(range: String, description: String)] = [
@@ -879,7 +880,7 @@ extension AranetClient: CBPeripheralDelegate {
         ("27", "Status (0x05=G, 0x0A=Y, 0x0B=R)"),
         ("28-35", "Total dose (UInt64 LE, uSv)"),
         ("36-43", "Realtime duration (UInt64 LE, sec, 60s granularity)"),
-        ("44-47", "Reserved (zero)"),
+        ("44-47", "Reserved (zero)")
     ]
 
     // MARK: - Data Parsing

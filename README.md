@@ -29,7 +29,7 @@ Add to your `Package.swift`:
 
 ```swift
 dependencies: [
-    .package(url: "https://github.com/heikopanjas/aranet-kit.git", from: "3.1.0")
+    .package(url: "https://github.com/heikopanjas/aranet-kit.git", from: "3.2.0")
 ]
 ```
 
@@ -238,7 +238,7 @@ The core Bluetooth functionality is available as a Swift package that can be imp
 ```swift
 // In your Package.swift
 dependencies: [
-    .package(url: "https://github.com/heikopanjas/aranet-kit.git", from: "3.1.0")
+    .package(url: "https://github.com/heikopanjas/aranet-kit.git", from: "3.2.0")
 ],
 targets: [
     .target(

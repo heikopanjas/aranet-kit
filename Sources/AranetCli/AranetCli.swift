@@ -177,7 +177,8 @@ private func scanAndMatchDevices(
     queries: [String],
     verbose: Bool
 ) async throws -> (client: AranetClient, matched: [AranetDevice], notFound: [String]) {
-    let scanLabel = queries.count == 1
+    let scanLabel =
+        queries.count == 1
         ? "Scanning for device '\(queries[0])'..."
         : "Scanning for \(queries.count) devices..."
     let spinner = await ProgressSpinner(message: scanLabel)
@@ -310,7 +311,8 @@ extension AranetCli {
                 queries: devices, verbose: verbose
             )
 
-            let readLabel = matched.count == 1
+            let readLabel =
+                matched.count == 1
                 ? "Reading from \(matched[0].name)..."
                 : "Reading from \(matched.count) devices..."
             let readSpinner = await ProgressSpinner(message: readLabel)
