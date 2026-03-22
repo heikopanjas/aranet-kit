@@ -208,7 +208,7 @@ guard let data = data,
 
 ### Library Structure
 
-**aranetcli** follows Swift Package Manager best practices with clear separation between library and executable:
+**aranet-cli** follows Swift Package Manager best practices with clear separation between library and executable:
 
 - **AranetKit** (library): Core Bluetooth client, data models, reusable components
 - **AranetCli** (executable): CLI application, command handling, user interface
@@ -873,7 +873,7 @@ The current version is defined in `Sources/AranetCli/AranetCli.swift` in the `Co
 
 ```swift
 static let configuration = CommandConfiguration(
-    commandName: "aranetcli",
+    commandName: "aranet-cli",
     abstract: "Command-line tool for Aranet Bluetooth sensors",
     version: "3.2.0",  // <-- Update this version
     subcommands: [Scan.self, Read.self, Monitor.self]
@@ -1340,14 +1340,15 @@ After making ANY code changes:
 
 - **Updated Package.swift structure**: Removed executable from products array, keeping only AranetKit library exposed
 - **Xcode visibility**: Executable hidden from "Add Package Dependencies" dialog (not in products)
-- **Binary output**: `AranetCli` (determined by target name)
-- **Local usage**: Can still build and run with `swift run AranetCli`
+- **Binary output**: `aranet-cli` (explicit executable product name)
+- **Local usage**: Can still build and run with `swift run aranet-cli`
 - **Package structure**:
   - Package name: `AranetCli`
   - Library product: `AranetKit` (public, for dependencies)
+  - Executable product: `aranet-cli` (public, maps to AranetCli target)
   - Library target: `AranetKit` in `Sources/AranetKit/`
   - Executable target: `AranetCli` in `Sources/AranetCli/`
-  - Binary output: `AranetCli`
+  - Binary output: `aranet-cli`
 - **Reasoning**: Standard pattern for packages providing both library and CLI tool - expose only the library as a product. This prevents the executable from appearing in Xcode's "Add Package Dependencies" dialog while keeping it available for local development.
 
 ### 2025-10-05

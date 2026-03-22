@@ -231,7 +231,7 @@ private func scanAndMatchDevices(
 @main
 struct AranetCli: AsyncParsableCommand {
     static let configuration = CommandConfiguration(
-        commandName: "aranetcli",
+        commandName: "aranet-cli",
         abstract: "Command-line tool for Aranet Bluetooth sensors",
         version: "3.2.0",
         subcommands: [Scan.self, Read.self, Monitor.self]

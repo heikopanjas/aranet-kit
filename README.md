@@ -41,12 +41,12 @@ cd aranet-kit
 swift build -c release
 ```
 
-The compiled binary will be at `.build/release/AranetCli`
+The compiled binary will be at `.build/release/aranet-cli`
 
 ### Run directly with Swift
 
 ```bash
-swift run AranetCli <command>
+swift run aranet-cli <command>
 ```
 
 ## Usage
@@ -57,10 +57,10 @@ Scan for nearby Aranet devices:
 
 ```bash
 # Default 10-second scan
-swift run AranetCli scan
+swift run aranet-cli scan
 
 # Custom timeout
-swift run AranetCli scan --timeout 15
+swift run aranet-cli scan --timeout 15
 ```
 
 Example output:
@@ -78,13 +78,13 @@ Read current measurements from one or more devices:
 
 ```bash
 # Single device by name (partial match)
-swift run AranetCli read 228EB
+swift run aranet-cli read 228EB
 
 # Multiple devices at once (concurrent reads)
-swift run AranetCli read 228EB 30F9A
+swift run aranet-cli read 228EB 30F9A
 
 # By UUID
-swift run AranetCli read "B6F33CE5-4712-5841-C308-B4217CDAFD68"
+swift run aranet-cli read "B6F33CE5-4712-5841-C308-B4217CDAFD68"
 ```
 
 Example output (multi-device):
@@ -119,13 +119,13 @@ Continuously monitor one or more devices with automatic periodic updates:
 
 ```bash
 # Monitor a single device
-swift run AranetCli monitor 228EB
+swift run aranet-cli monitor 228EB
 
 # Monitor multiple devices concurrently
-swift run AranetCli monitor 228EB 30F9A
+swift run aranet-cli monitor 228EB 30F9A
 
 # Monitor with verbose output
-swift run AranetCli monitor 228EB --verbose
+swift run aranet-cli monitor 228EB --verbose
 ```
 
 The monitor command:
@@ -176,7 +176,7 @@ If you see "Bluetooth access is not authorized", grant Bluetooth permissions:
 
 If you get "Error: Device not found":
 
-1. Run `swift run AranetCli scan` first to see available devices
+1. Run `swift run aranet-cli scan` first to see available devices
 2. Use the exact device name or UUID from the scan results
 3. Device names are case-insensitive and support partial matching
 4. Ensure the device is nearby and powered on
@@ -206,7 +206,7 @@ If scanning finds no devices:
 
 1. Ensure your Aranet device is powered on and nearby
 2. Make sure "Smart Home integrations" is enabled in the Aranet Home mobile app
-3. Try increasing the scan timeout: `swift run AranetCli scan --timeout 15`
+3. Try increasing the scan timeout: `swift run aranet-cli scan --timeout 15`
 4. Check if the device is already connected to another application
 
 ## Supported Devices

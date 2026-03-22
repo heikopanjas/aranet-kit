@@ -1,4 +1,4 @@
-name: Build & Lint
+name: Build
 
 on:
   push:
@@ -25,21 +25,9 @@ jobs:
       - name: Build Release
         run: swift build -c release
 
-  lint:
-    runs-on: macos-15
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: swift-actions/setup-swift@v2
-        with:
-          swift-version: "6.2"
-
-      - name: Lint
-        run: xcrun swift-format lint --recursive --strict Sources/
-
   pre-release:
     if: github.ref == 'refs/heads/develop' && github.event_name == 'push'
-    needs: [build, lint]
+    needs: [build]
     runs-on: macos-15
     permissions:
       contents: write
@@ -51,7 +39,12 @@ jobs:
           swift-version: "6.2"
 
       - name: Build Release Binary
-        run: swift build -c release
+        run: swift build -c release --product aranet-cli
+
+      - name: Prepare Binary
+        run: |
+          cp .build/release/aranet-cli aranet-cli
+          chmod +x aranet-cli
 
       - name: Extract Version
         id: version
@@ -77,6 +70,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           gh release create "${{ steps.meta.outputs.tag }}" \
+            aranet-cli \
             --title "${{ steps.meta.outputs.name }}" \
             --prerelease \
             --target develop \

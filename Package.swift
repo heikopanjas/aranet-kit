@@ -14,6 +14,11 @@ let package = Package(
             name: "AranetKit",
             targets: ["AranetKit"]
         ),
+        // CLI executable
+        .executable(
+            name: "aranet-cli",
+            targets: ["AranetCli"]
+        )
     ],
     dependencies: [
         .package(url: "https://github.com/apple/swift-argument-parser.git", from: "1.2.0")

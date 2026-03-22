@@ -39,6 +39,26 @@
       "target": "AranetCli",
       "configuration": "release",
       "preLaunchTask": "swift: Build Release AranetCli"
+    },
+    {
+      "type": "swift",
+      "request": "launch",
+      "args": [],
+      "cwd": "${workspaceFolder:aranet-kit}",
+      "name": "Debug aranet-cli",
+      "target": "aranet-cli",
+      "configuration": "debug",
+      "preLaunchTask": "swift: Build Debug aranet-cli"
+    },
+    {
+      "type": "swift",
+      "request": "launch",
+      "args": [],
+      "cwd": "${workspaceFolder:aranet-kit}",
+      "name": "Release aranet-cli",
+      "target": "aranet-cli",
+      "configuration": "release",
+      "preLaunchTask": "swift: Build Release aranet-cli"
     }
   ]
 }
