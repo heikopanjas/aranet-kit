@@ -1,6 +1,8 @@
-# AranetKit & CLI
+# AranetKit & aranet-cli
 
-A Swift command-line tool for interacting with Aranet Bluetooth sensors (Aranet4, Aranet2, Aranet Radiation, Aranet Radon Plus).
+[![Build](https://github.com/heikopanjas/aranet-kit/actions/workflows/build.yml/badge.svg)](https://github.com/heikopanjas/aranet-kit/actions/workflows/build.yml)
+
+A Swift command-line tool and library for interacting with Aranet Bluetooth sensors (Aranet4, Aranet2, Aranet Radiation, Aranet Radon Plus).
 
 ## Features
 
@@ -23,9 +25,18 @@ A Swift command-line tool for interacting with Aranet Bluetooth sensors (Aranet4
 
 ## Installation
 
-### Swift Package Manager
+### Download pre-built binary
 
-Add to your `Package.swift`:
+Download the latest `aranet-cli` binary from [GitHub Releases](https://github.com/heikopanjas/aranet-kit/releases), then:
+
+```bash
+chmod +x aranet-cli
+sudo mv aranet-cli /usr/local/bin/
+```
+
+### Swift Package Manager (library only)
+
+Add AranetKit to your `Package.swift`:
 
 ```swift
 dependencies: [
@@ -43,13 +54,10 @@ swift build -c release
 
 The compiled binary will be at `.build/release/aranet-cli`
 
-### Run directly with Swift
-
-```bash
-swift run aranet-cli <command>
-```
-
 ## Usage
+
+> **Note:** The examples below use `aranet-cli` directly (assuming the binary is installed).
+> If running from source, replace `aranet-cli` with `swift run aranet-cli`.
 
 ### Scan for devices
 
@@ -57,10 +65,10 @@ Scan for nearby Aranet devices:
 
 ```bash
 # Default 10-second scan
-swift run aranet-cli scan
+aranet-cli scan
 
 # Custom timeout
-swift run aranet-cli scan --timeout 15
+aranet-cli scan --timeout 15
 ```
 
 Example output:
@@ -78,13 +86,13 @@ Read current measurements from one or more devices:
 
 ```bash
 # Single device by name (partial match)
-swift run aranet-cli read 228EB
+aranet-cli read 228EB
 
 # Multiple devices at once (concurrent reads)
-swift run aranet-cli read 228EB 30F9A
+aranet-cli read 228EB 30F9A
 
 # By UUID
-swift run aranet-cli read "B6F33CE5-4712-5841-C308-B4217CDAFD68"
+aranet-cli read "B6F33CE5-4712-5841-C308-B4217CDAFD68"
 ```
 
 Example output (multi-device):
@@ -119,13 +127,13 @@ Continuously monitor one or more devices with automatic periodic updates:
 
 ```bash
 # Monitor a single device
-swift run aranet-cli monitor 228EB
+aranet-cli monitor 228EB
 
 # Monitor multiple devices concurrently
-swift run aranet-cli monitor 228EB 30F9A
+aranet-cli monitor 228EB 30F9A
 
 # Monitor with verbose output
-swift run aranet-cli monitor 228EB --verbose
+aranet-cli monitor 228EB --verbose
 ```
 
 The monitor command:
@@ -176,7 +184,7 @@ If you see "Bluetooth access is not authorized", grant Bluetooth permissions:
 
 If you get "Error: Device not found":
 
-1. Run `swift run aranet-cli scan` first to see available devices
+1. Run `aranet-cli scan` first to see available devices
 2. Use the exact device name or UUID from the scan results
 3. Device names are case-insensitive and support partial matching
 4. Ensure the device is nearby and powered on
@@ -206,15 +214,17 @@ If scanning finds no devices:
 
 1. Ensure your Aranet device is powered on and nearby
 2. Make sure "Smart Home integrations" is enabled in the Aranet Home mobile app
-3. Try increasing the scan timeout: `swift run aranet-cli scan --timeout 15`
+3. Try increasing the scan timeout: `aranet-cli scan --timeout 15`
 4. Check if the device is already connected to another application
 
 ## Supported Devices
 
-- **Aranet4** - CO2, temperature, humidity, pressure
-- **Aranet2** - Temperature, humidity (partial support)
-- **Aranet Radiation** - Radiation measurements (partial support)
-- **Aranet Radon Plus** - Radon concentration (partial support)
+| Device | Measurements | Status |
+|--------|-------------|--------|
+| [**Aranet4**](https://aranet.com/en/home/products/aranet4-home) | CO2, temperature, humidity, pressure | Fully supported |
+| [**Aranet Radiation**](https://aranet.com/en/home/products/aranet-radiation-sensor) | Dose rate, cumulative dose, duration | Fully supported |
+| [**Aranet2 HOME**](https://aranet.com/en/home/products/aranet2-home) | Temperature, humidity | Experimental, untested |
+| [**Aranet Radon Plus**](https://aranet.com/en/home/products/aranet-radon-sensor) | Radon concentration | Experimental, untested |
 
 ## Development
 
@@ -295,11 +305,11 @@ if let device = devices.first {
 # Build debug version
 swift build
 
-# Run tests
-swift test
-
 # Build release version
 swift build -c release
+
+# Run from source
+swift run aranet-cli scan
 ```
 
 ## License
