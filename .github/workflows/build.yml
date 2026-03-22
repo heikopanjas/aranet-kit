@@ -2,9 +2,12 @@ name: Build & Lint
 
 on:
   push:
-    branches: [main]
+    branches:
+      - develop
+      - "feature/**"
   pull_request:
-    branches: [main]
+    branches:
+      - develop
 
 jobs:
   build:
@@ -33,3 +36,48 @@ jobs:
 
       - name: Lint
         run: xcrun swift-format lint --recursive --strict Sources/
+
+  pre-release:
+    if: github.ref == 'refs/heads/develop' && github.event_name == 'push'
+    needs: [build, lint]
+    runs-on: macos-15
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: swift-actions/setup-swift@v2
+        with:
+          swift-version: "6.2"
+
+      - name: Build Release Binary
+        run: swift build -c release
+
+      - name: Extract Version
+        id: version
+        run: |
+          VERSION=$(grep 'version:' Sources/AranetCli/AranetCli.swift | head -1 | sed 's/.*"\(.*\)".*/\1/')
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+
+      - name: Generate Tag and Name
+        id: meta
+        run: |
+          DATETIME=$(date -u +'%Y%m%d_%H%M%S')
+          DATE=$(date -u +'%Y%m%d')
+          TIME=$(date -u +'%H%M%S')
+          BUILD=${{ github.run_number }}
+          VERSION=${{ steps.version.outputs.version }}
+          TAG="R${VERSION}_BUILD_${BUILD}_${DATETIME}"
+          NAME="aranet-kit-build-${BUILD}-${DATE}-${TIME}"
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+          echo "name=$NAME" >> "$GITHUB_OUTPUT"
+
+      - name: Create Pre-Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "${{ steps.meta.outputs.tag }}" \
+            --title "${{ steps.meta.outputs.name }}" \
+            --prerelease \
+            --target develop \
+            --generate-notes
