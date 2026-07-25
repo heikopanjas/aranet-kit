@@ -10,6 +10,9 @@ on:
       - develop
 
 jobs:
+  lint:
+    uses: ./.github/workflows/lint.yml
+
   build:
     runs-on: macos-15
     steps:
@@ -20,14 +23,18 @@ jobs:
           swift-version: "6.2"
 
       - name: Build
-        run: swift build
+        run: |
+          swift build
+          scripts/verify-binary-architecture.sh "$(swift build --show-bin-path)/aranet-cli"
 
       - name: Build Release
-        run: swift build -c release
+        run: |
+          swift build -c release
+          scripts/verify-binary-architecture.sh "$(swift build -c release --show-bin-path)/aranet-cli"
 
   pre-release:
     if: github.ref == 'refs/heads/develop' && github.event_name == 'push'
-    needs: [build]
+    needs: [build, lint]
     runs-on: macos-15
     permissions:
       contents: write
@@ -43,13 +50,15 @@ jobs:
 
       - name: Prepare Binary
         run: |
-          cp .build/release/aranet-cli aranet-cli
+          BINARY="$(swift build -c release --show-bin-path)/aranet-cli"
+          scripts/verify-binary-architecture.sh "$BINARY"
+          cp "$BINARY" aranet-cli
           chmod +x aranet-cli
 
       - name: Extract Version
         id: version
         run: |
-          VERSION=$(grep 'version:' Sources/AranetCli/AranetCli.swift | head -1 | sed 's/.*"\(.*\)".*/\1/')
+          VERSION=$(scripts/extract-version.sh)
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
 
       - name: Generate Tag and Name

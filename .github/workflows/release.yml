@@ -1,0 +1,258 @@
+name: Release
+
+on:
+  pull_request:
+    branches:
+      - main
+    types:
+      - opened
+      - synchronize
+      - reopened
+      - labeled
+      - unlabeled
+      - closed
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event.action != 'closed' }}
+
+jobs:
+  lint:
+    uses: ./.github/workflows/lint.yml
+
+  validate:
+    runs-on: macos-15
+    outputs:
+      release: ${{ steps.validate.outputs.release }}
+      version: ${{ steps.validate.outputs.version }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          fetch-tags: true
+
+      - name: Validate release metadata
+        id: validate
+        env:
+          SKIP_RELEASE: ${{ github.event_name == 'pull_request' && contains(github.event.pull_request.labels.*.name, 'skip-release') }}
+        run: |
+          if [[ "$SKIP_RELEASE" == "true" ]]; then
+            echo "skip-release label present; release validation is bypassed"
+            echo "release=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          VERSION=$(scripts/verify-version.sh)
+          if git rev-parse --verify --quiet "refs/tags/v$VERSION" >/dev/null; then
+            echo "error: tag v$VERSION already exists" >&2
+            exit 1
+          fi
+
+          scripts/changelog-section.sh "$VERSION" > release-notes.md
+          echo "release=true" >> "$GITHUB_OUTPUT"
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+
+      - name: Upload release notes
+        if: steps.validate.outputs.release == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-notes
+          path: release-notes.md
+          if-no-files-found: error
+
+  dry-run:
+    if: github.event_name == 'pull_request' && github.event.action != 'closed' && needs.validate.outputs.release == 'true'
+    needs:
+      - lint
+      - validate
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: swift-actions/setup-swift@v2
+        with:
+          swift-version: "6.2"
+
+      - name: Build arm64 release binary
+        id: binary
+        run: |
+          swift build -c release --product aranet-cli
+          BINARY="$(swift build -c release --show-bin-path)/aranet-cli"
+          scripts/verify-binary-architecture.sh "$BINARY"
+          echo "path=$BINARY" >> "$GITHUB_OUTPUT"
+
+      - name: Package dry-run artifacts
+        run: scripts/package-release.sh "${{ needs.validate.outputs.version }}" "${{ steps.binary.outputs.path }}"
+
+      - name: Upload dry-run artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: aranet-cli-${{ needs.validate.outputs.version }}-dry-run
+          path: dist/
+          if-no-files-found: error
+
+  release:
+    if: >-
+      needs.validate.outputs.release == 'true' &&
+      ((github.event_name == 'pull_request' && github.event.pull_request.merged == true) ||
+      github.event_name == 'workflow_dispatch')
+    needs:
+      - lint
+      - validate
+    runs-on: macos-15
+    timeout-minutes: 45
+    env:
+      APPLE_CERTIFICATE_P12_BASE64: ${{ secrets.APPLE_CERTIFICATE_P12_BASE64 }}
+      APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+      APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
+      APPSTORE_CONNECT_KEY_ID: ${{ secrets.APPSTORE_CONNECT_KEY_ID }}
+      APPSTORE_CONNECT_ISSUER_ID: ${{ secrets.APPSTORE_CONNECT_ISSUER_ID }}
+      APPSTORE_CONNECT_KEY_P8_BASE64: ${{ secrets.APPSTORE_CONNECT_KEY_P8_BASE64 }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+          fetch-tags: true
+
+      - uses: swift-actions/setup-swift@v2
+        with:
+          swift-version: "6.2"
+
+      - name: Validate release credentials
+        run: |
+          for variable in \
+            APPLE_CERTIFICATE_P12_BASE64 \
+            APPLE_CERTIFICATE_PASSWORD \
+            APPLE_SIGNING_IDENTITY \
+            APPSTORE_CONNECT_KEY_ID \
+            APPSTORE_CONNECT_ISSUER_ID \
+            APPSTORE_CONNECT_KEY_P8_BASE64
+          do
+            if [[ -z "${!variable}" ]]; then
+              echo "error: repository secret $variable is missing" >&2
+              exit 1
+            fi
+          done
+
+      - name: Download release notes
+        uses: actions/download-artifact@v4
+        with:
+          name: release-notes
+
+      - name: Build arm64 release binary
+        id: binary
+        run: |
+          swift build -c release --product aranet-cli
+          BINARY="$(swift build -c release --show-bin-path)/aranet-cli"
+          scripts/verify-binary-architecture.sh "$BINARY"
+          cp "$BINARY" "$RUNNER_TEMP/aranet-cli"
+          echo "path=$RUNNER_TEMP/aranet-cli" >> "$GITHUB_OUTPUT"
+
+      - name: Import Developer ID certificate
+        env:
+          KEYCHAIN_PASSWORD: ${{ github.run_id }}-${{ github.run_attempt }}
+        run: |
+          CERTIFICATE_PATH="$RUNNER_TEMP/DeveloperID.p12"
+          KEYCHAIN_PATH="$RUNNER_TEMP/release.keychain-db"
+          printf '%s' "$APPLE_CERTIFICATE_P12_BASE64" | base64 -D > "$CERTIFICATE_PATH"
+          security create-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+          security set-keychain-settings -lut 21600 "$KEYCHAIN_PATH"
+          security unlock-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+          security import "$CERTIFICATE_PATH" -P "$APPLE_CERTIFICATE_PASSWORD" -A -t cert -f pkcs12 -k "$KEYCHAIN_PATH" -T /usr/bin/codesign
+          security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+          security list-keychains -d user -s "$KEYCHAIN_PATH" login.keychain-db
+
+      - name: Sign release binary
+        run: |
+          codesign --force --options runtime --timestamp --sign "$APPLE_SIGNING_IDENTITY" "${{ steps.binary.outputs.path }}"
+          codesign --verify --strict --verbose=2 "${{ steps.binary.outputs.path }}"
+
+      - name: Notarize release binary
+        run: |
+          KEY_PATH="$RUNNER_TEMP/AuthKey.p8"
+          NOTARIZATION_ARCHIVE="$RUNNER_TEMP/aranet-cli-notarization.zip"
+          NOTARIZATION_RESULT="$RUNNER_TEMP/notarization-result.json"
+
+          printf '%s' "$APPSTORE_CONNECT_KEY_P8_BASE64" | base64 -D > "$KEY_PATH"
+          chmod 600 "$KEY_PATH"
+          ditto -c -k --keepParent "${{ steps.binary.outputs.path }}" "$NOTARIZATION_ARCHIVE"
+
+          set +e
+          xcrun notarytool submit "$NOTARIZATION_ARCHIVE" \
+            --key "$KEY_PATH" \
+            --key-id "$APPSTORE_CONNECT_KEY_ID" \
+            --issuer "$APPSTORE_CONNECT_ISSUER_ID" \
+            --wait \
+            --timeout 30m \
+            --output-format json > "$NOTARIZATION_RESULT"
+          NOTARIZATION_STATUS=$?
+          set -e
+
+          cat "$NOTARIZATION_RESULT"
+          if [[ $NOTARIZATION_STATUS -ne 0 ]]; then
+            SUBMISSION_ID=$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1])).get("id", ""))' "$NOTARIZATION_RESULT" 2>/dev/null || true)
+            if [[ -n "$SUBMISSION_ID" ]]; then
+              xcrun notarytool log "$SUBMISSION_ID" \
+                --key "$KEY_PATH" \
+                --key-id "$APPSTORE_CONNECT_KEY_ID" \
+                --issuer "$APPSTORE_CONNECT_ISSUER_ID" || true
+            fi
+            exit "$NOTARIZATION_STATUS"
+          fi
+
+      - name: Package release artifacts
+        run: scripts/package-release.sh "${{ needs.validate.outputs.version }}" "${{ steps.binary.outputs.path }}"
+
+      - name: Complete release notes
+        env:
+          VERSION: ${{ needs.validate.outputs.version }}
+        run: |
+          CHECKSUM=$(swift package compute-checksum "dist/aranet-cli-$VERSION.artifactbundle.zip")
+          cat >> release-notes.md <<EOF
+
+          ## Installation
+
+          ### AranetKit library
+
+          AranetKit is distributed as source through this release tag:
+
+          \`\`\`swift
+          .package(url: "https://github.com/heikopanjas/aranet-kit.git", from: "$VERSION")
+          \`\`\`
+
+          ### aranet-cli executable
+
+          The prebuilt executable supports Apple Silicon Macs only. Add the executable artifact bundle as a binary target:
+
+          \`\`\`swift
+          .binaryTarget(
+              name: "aranet-cli",
+              url: "https://github.com/heikopanjas/aranet-kit/releases/download/v$VERSION/aranet-cli-$VERSION.artifactbundle.zip",
+              checksum: "$CHECKSUM"
+          )
+          \`\`\`
+          EOF
+
+      - name: Create GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ needs.validate.outputs.version }}
+        run: |
+          gh release create "v$VERSION" \
+            "dist/aranet-cli-$VERSION-macos-arm64.tar.gz" \
+            "dist/aranet-cli-$VERSION.artifactbundle.zip" \
+            "dist/SHA256SUMS.txt" \
+            --title "v$VERSION" \
+            --notes-file release-notes.md \
+            --target main
+
+      - name: Clean up signing credentials
+        if: always()
+        run: |
+          rm -f "$RUNNER_TEMP/DeveloperID.p12" "$RUNNER_TEMP/AuthKey.p8"
+          security delete-keychain "$RUNNER_TEMP/release.keychain-db" 2>/dev/null || true

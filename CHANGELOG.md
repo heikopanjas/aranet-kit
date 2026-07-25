@@ -7,6 +7,50 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.5.1] - 2026-07-26
+
+### Added
+
+- Signed and notarized arm64 release workflow for pull requests merged into `main`
+- SwiftPM executable artifact bundle, compressed CLI archive, and SHA-256 checksums
+- Reusable strict Swift source lint workflow
+- `skip-release` pull-request label for changes that do not require a release
+- Shared scripts for version validation, architecture checks, and release packaging
+
+### Changed
+
+- `develop` pre-releases now use the canonical `toolVersion` and verify arm64 output
+- Release metadata must match between `AranetCli.toolVersion` and this changelog
+
+### Fixed
+
+- Broken pre-release version extraction after the version moved to `toolVersion`
+
+## [3.5.0] - 2026-07-25
+
+### Added
+
+- `--json` flag on every subcommand for machine-readable output
+- Shared `GlobalOptions` option group for `--verbose` and `--json`
+- Deterministic JSON device, measurement, reading, and error payloads
+
+### Fixed
+
+- Duplicate monitor error output when a stream fails
+
+## [3.4.0] - 2026-07-25
+
+### Changed
+
+- `--version` is now a root-only flag and no longer appears on subcommand help pages
+- The canonical version moved to `AranetCli.toolVersion`
+
+## [3.3.1] - 2026-07-25
+
+### Changed
+
+- Corrected README installation, timeout, device capability, notification, and API documentation
+
 ## [3.3.0] - 2026-07-25
 
 ### Added
@@ -129,7 +173,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Troubleshooting guide
 - Development setup instructions
 
-[Unreleased]: https://github.com/heikopanjas/aranet-kit/compare/v3.2.0...HEAD
+[Unreleased]: https://github.com/heikopanjas/aranet-kit/compare/v3.5.1...HEAD
+[3.5.1]: https://github.com/heikopanjas/aranet-kit/compare/v3.5.0...v3.5.1
+[3.5.0]: https://github.com/heikopanjas/aranet-kit/compare/v3.4.0...v3.5.0
+[3.4.0]: https://github.com/heikopanjas/aranet-kit/compare/v3.3.1...v3.4.0
+[3.3.1]: https://github.com/heikopanjas/aranet-kit/compare/v3.3.0...v3.3.1
+[3.3.0]: https://github.com/heikopanjas/aranet-kit/compare/v3.2.0...v3.3.0
 [3.2.0]: https://github.com/heikopanjas/aranet-kit/compare/v3.1.0...v3.2.0
 [3.1.0]: https://github.com/heikopanjas/aranet-kit/compare/v3.0.0...v3.1.0
 [3.0.0]: https://github.com/heikopanjas/aranet-kit/compare/v2.0.0...v3.0.0

@@ -1,6 +1,6 @@
 # Project Instructions for AI Coding Agents
 
-**Last updated:** 2026-07-25
+**Last updated:** 2026-07-26
 
 <!-- {mission} -->
 
@@ -717,11 +717,11 @@ swift package generate-documentation --output-path ./docs
 ### Code Quality
 
 ```bash
-# Format code (requires swift-format tool)
-swift-format format --in-place --recursive .
+# Format code with the Xcode-bundled swift-format
+xcrun swift-format format --configuration .swift-format --in-place --recursive Sources
 
-# Lint code (requires swift-format tool)
-swift-format lint --recursive .
+# Lint code; --strict makes findings fail CI
+xcrun swift-format lint --configuration .swift-format --recursive --strict Sources
 
 # Run with sanitizers (debug builds)
 swift build --sanitize=address
@@ -764,13 +764,81 @@ xcodebuild -scheme <scheme_name> -destination 'platform=iOS Simulator,name=iPhon
 # Archive for distribution (requires macOS with Xcode)
 xcodebuild archive -scheme <scheme_name> -archivePath ./build/App.xcarchive
 
-# Build universal binary (macOS)
-swift build -c release --arch arm64 --arch x86_64
+# Verify the arm64 release artifact
+scripts/verify-binary-architecture.sh "$(swift build -c release --show-bin-path)/aranet-cli"
 ```
 
 **Important**: Always use debug builds (`swift build`) during development. Debug builds compile faster and include debugging symbols. Only use release builds (`swift build -c release`) for final testing or deployment.
 
 <!-- {integration} -->
+
+## Release Process
+
+### Workflow and Version Gate
+
+- Direct pushes to `main` are disabled. `.github/workflows/release.yml` runs for pull
+  requests targeting `main`.
+- Open, synchronized, reopened, labeled, and unlabeled pull requests run strict linting,
+  release metadata validation, and an unsigned arm64 packaging dry run.
+- A merged pull request runs the signed and notarized release job from `main` and creates
+  the `v<toolVersion>` tag and GitHub release.
+- `Sources/AranetCli/AranetCli.swift` and the newest released section in `CHANGELOG.md`
+  must contain the same semantic version. The release fails if that tag already exists.
+- Apply the `skip-release` label to changes that do not require a version bump. The
+  validation job reports success while packaging and publishing are skipped. The
+  workflow listens for both label addition and removal so required checks are refreshed.
+- `lint` and `validate` must be required status checks in `main` branch protection.
+
+### Architecture and Artifacts
+
+- All CI binaries are Apple Silicon `arm64`; every build verifies the Mach-O architecture
+  with `scripts/verify-binary-architecture.sh`.
+- Release assets are `aranet-cli-<version>-macos-arm64.tar.gz`,
+  `aranet-cli-<version>.artifactbundle.zip`, and `SHA256SUMS.txt`.
+- The pre-built executable supports Apple Silicon Macs only. Intel users build from source.
+- `AranetKit` is distributed as source through the release tag. Do not publish an
+  `.xcframework` or DocC archive unless this decision changes.
+- `scripts/extract-version.sh`, `scripts/changelog-section.sh`,
+  `scripts/verify-version.sh`, and `scripts/package-release.sh` are the shared release
+  implementation. Keep workflows DRY by updating these helpers rather than duplicating logic.
+
+### Signing and Notarization
+
+- Sign with Developer ID Application, hardened runtime, and a secure timestamp.
+- Authenticate `notarytool` with an App Store Connect API Team Key. Individual API keys
+  cannot notarize Developer ID software.
+- A bare Mach-O executable cannot hold a stapled notarization ticket. The release is
+  notarized but not stapled; Gatekeeper performs an online ticket lookup.
+- Required GitHub Actions repository secrets:
+  - `APPLE_CERTIFICATE_P12_BASE64`
+  - `APPLE_CERTIFICATE_PASSWORD`
+  - `APPLE_SIGNING_IDENTITY`
+  - `APPSTORE_CONNECT_KEY_ID`
+  - `APPSTORE_CONNECT_ISSUER_ID`
+  - `APPSTORE_CONNECT_KEY_P8_BASE64`
+- Never print or persist decoded credentials. The workflow uses an ephemeral keychain and
+  removes the decoded `.p12` and `.p8` files in an unconditional cleanup step.
+- Never expose signing or notarization secrets to pull-request validation or dry-run jobs.
+  Secrets are available only to the post-merge release job running trusted `main` content.
+- Team keys do not expire but can be revoked. Rotate one by revoking it, generating a new
+  Team Key, and replacing the key ID and base64 `.p8` secrets. Developer ID certificates
+  expire and must be re-exported with their private key before expiry.
+
+### Release Helpers
+
+```bash
+# Print the canonical CLI version
+scripts/extract-version.sh
+
+# Verify toolVersion and CHANGELOG agree
+scripts/verify-version.sh
+
+# Extract one release-notes section
+scripts/changelog-section.sh 3.5.1
+
+# Package an already-built signed executable
+scripts/package-release.sh 3.5.1 /path/to/aranet-cli
+```
 
 ## Commit Protocol (CRITICAL)
 
@@ -875,7 +943,7 @@ The current version is defined in `Sources/AranetCli/AranetCli.swift` as the `to
 @main
 struct AranetCli: AsyncParsableCommand {
     /// Current tool version, reported by the root-level `--version` flag.
-    static let toolVersion = "3.5.0"  // <-- Update this version
+    static let toolVersion = "3.5.1"  // <-- Update this version
 
     static let configuration = CommandConfiguration(
         commandName: "aranet-cli",
@@ -923,6 +991,27 @@ After making ANY code changes:
 ---
 
 ## Recent Updates & Decisions
+
+### 2026-07-26 (Signed arm64 Releases, Version 3.5.1)
+
+- **Patch version bump**: 3.5.0 to 3.5.1
+- **Release workflow**: Pull requests into `main` now validate metadata and package an
+  unsigned dry run; merged pull requests create signed and notarized GitHub releases
+- **Apple Silicon artifacts**: Debug, release, pre-release, and final release binaries are
+  verified as arm64; Intel users build from source
+- **Distribution**: Releases attach a CLI tarball, executable artifact bundle, and SHA-256
+  checksums; `AranetKit` remains a source package distributed by the release tag
+- **Signing**: Developer ID certificate in an ephemeral keychain with App Store Connect
+  API Team Key notarization; bare executable is not stapled because Mach-O cannot hold a ticket
+- **Version gate**: Shared scripts ensure `toolVersion`, CHANGELOG, and release tags agree
+- **`skip-release` label**: Allows documentation-only PRs to bypass release metadata checks
+  and publishing while keeping the required validation check green
+- **Strict lint restored**: Reusable `lint.yml` runs Xcode's bundled swift-format with
+  `--strict` from both build and release workflows
+- **Files changed**: `.github/workflows/`, `scripts/`, `Sources/`, `.gitignore`,
+  `README.md`, `CHANGELOG.md`, `AGENTS.md`
+- **Reasoning**: Development snapshots were unsigned single-file uploads, version extraction
+  had broken after v3.4.0, and the repository lacked a reproducible production release path
 
 ### 2026-07-25 (JSON Script and Agent Mode, Version 3.5.0)
 
@@ -996,8 +1085,9 @@ After making ANY code changes:
 ### 2026-03-22 12:00 (Publication Preparation)
 
 - **CHANGELOG backfill**: Added entries for v1.0.1 through v3.2.0 using AGENTS.md decision log
-- **GitHub Actions CI**: Created `.github/workflows/build.yml` with macOS-15 runner, Swift 6.2, build + lint jobs
-  - Uses `xcrun swift-format` (bundled with Xcode toolchain) instead of standalone swift-format
+- **GitHub Actions CI**: Created `.github/workflows/build.yml` with macOS-15 runner and Swift 6.2 build jobs
+  - A lint job using bundled `xcrun swift-format` was intended and documented here but was
+    omitted from the workflow; it was restored on 2026-07-26
 - **Lint fixes**: Resolved all 16 swift-format lint violations across Sources/
   - Added `// swift-format-ignore` for Dimension baseUnit() force cast pattern (Units.swift)
   - Added `// swift-format-ignore` for CBCentralManager IUO and protocol RSSI parameter (AranetClient.swift)

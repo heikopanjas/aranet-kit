@@ -1,0 +1,16 @@
+name: Lint
+
+on:
+  workflow_call:
+
+permissions:
+  contents: read
+
+jobs:
+  lint:
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Lint Swift sources
+        run: xcrun swift-format lint --configuration .swift-format --recursive --strict Sources

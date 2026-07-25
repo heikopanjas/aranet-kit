@@ -29,9 +29,15 @@ A Swift command-line tool and library for interacting with Aranet Bluetooth sens
 
 ### Download pre-built binary
 
-Download the latest `aranet-cli` binary from [GitHub Releases](https://github.com/heikopanjas/aranet-kit/releases), then:
+Download `aranet-cli-<version>-macos-arm64.tar.gz` and `SHA256SUMS.txt` from the
+[latest GitHub release](https://github.com/heikopanjas/aranet-kit/releases/latest).
+The pre-built, signed and notarized executable supports Apple Silicon Macs only. Intel
+Mac users must [build from source](#build-from-source).
 
 ```bash
+grep macos-arm64 SHA256SUMS.txt | shasum -a 256 -c -
+tar -xzf aranet-cli-<version>-macos-arm64.tar.gz
+cd aranet-cli-<version>-macos-arm64
 chmod +x aranet-cli
 sudo mv aranet-cli /usr/local/bin/
 ```
@@ -43,9 +49,13 @@ To use the library in your own project, add it to your `Package.swift`:
 
 ```swift
 dependencies: [
-    .package(url: "https://github.com/heikopanjas/aranet-kit.git", from: "3.5.0")
+    .package(url: "https://github.com/heikopanjas/aranet-kit.git", from: "3.5.1")
 ]
 ```
+
+`AranetKit` is distributed as source through each release tag. Releases also contain an
+arm64 executable artifact bundle for build tools that consume SwiftPM binary targets;
+the matching `.binaryTarget` declaration and checksum are included in the release notes.
 
 ### Build from source
 
@@ -55,7 +65,7 @@ cd aranet-kit
 swift build -c release
 ```
 
-The compiled binary will be at `.build/release/aranet-cli`
+Find the compiled binary with `swift build -c release --show-bin-path`.
 
 ## Usage
 
@@ -345,7 +355,7 @@ The core Bluetooth functionality is available as a Swift package that can be imp
 ```swift
 // In your Package.swift
 dependencies: [
-    .package(url: "https://github.com/heikopanjas/aranet-kit.git", from: "3.5.0")
+    .package(url: "https://github.com/heikopanjas/aranet-kit.git", from: "3.5.1")
 ],
 targets: [
     .target(
