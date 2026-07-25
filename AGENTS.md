@@ -1,6 +1,6 @@
 # Project Instructions for AI Coding Agents
 
-**Last updated:** 2026-03-22 12:00
+**Last updated:** 2026-07-25
 
 <!-- {mission} -->
 
@@ -918,6 +918,17 @@ After making ANY code changes:
 ---
 
 ## Recent Updates & Decisions
+
+### 2026-07-25 (Version 3.3.0)
+
+- **Minor version bump**: Updated `aranet-cli` to version 3.3.0 for the new monitor-reading notification API and menu-tracking timer fix
+- **Reasoning**: The public notification API is a backward-compatible feature, so it requires a minor SemVer increment
+
+### 2026-05-20 (Monitor Notifications and Menu-Tracking Timers)
+
+- **`Notification.Name.aranetReadingDidUpdate`**: Posted by `monitor(from:)` with `AranetNotificationKey` user info (`device`, `reading`, `receivedAt`)
+- **Monitor timer run loop mode**: `monitoringLoop` waits via `RunLoop.main` `.common` mode so scheduled reads continue while AppKit menus are tracked
+- **Reasoning**: macOS pauses default-mode timers during menu tracking; senor-particle and other menu bar apps need live readings without app-level polling workarounds
 
 ### 2026-03-22 12:00 (Publication Preparation)
 

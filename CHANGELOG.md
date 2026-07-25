@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.3.0] - 2026-07-25
+
+### Added
+
+- `Notification.Name.aranetReadingDidUpdate` posted by `monitor(from:)` with device, reading, and receive time in user info
+
+### Fixed
+
+- Monitor scheduling timers now use `RunLoop.main` `.common` mode so readings continue while AppKit menus are tracked
+
 ## [3.2.0] - 2026-03-14
 
 ### Added
