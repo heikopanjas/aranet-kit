@@ -9,6 +9,8 @@ A Swift command-line tool and library for interacting with Aranet Bluetooth sens
 - **Scan** for nearby Aranet devices
 - **Read** current sensor measurements from one or more devices concurrently
 - **Monitor** sensor values with automatic periodic updates (single or multi-device)
+- **JSON mode** - `--json` for scripts and agents: data only, no progress output
+- **Notifications** - `NotificationCenter` broadcasts for every monitored reading
 - **Swift Foundation Units** - Type-safe measurements with automatic unit conversions
 - **No CoreBluetooth required** - library API uses pure Swift value types (`AranetDevice`)
 - **Progress indicators** - Visual feedback during scanning and connecting
@@ -34,13 +36,14 @@ chmod +x aranet-cli
 sudo mv aranet-cli /usr/local/bin/
 ```
 
-### Swift Package Manager (library only)
+### Swift Package Manager
 
-Add AranetKit to your `Package.swift`:
+The package vends two products: the `AranetKit` library and the `aranet-cli` executable.
+To use the library in your own project, add it to your `Package.swift`:
 
 ```swift
 dependencies: [
-    .package(url: "https://github.com/heikopanjas/aranet-kit.git", from: "3.2.0")
+    .package(url: "https://github.com/heikopanjas/aranet-kit.git", from: "3.5.0")
 ]
 ```
 
@@ -64,12 +67,18 @@ The compiled binary will be at `.build/release/aranet-cli`
 Scan for nearby Aranet devices:
 
 ```bash
-# Default 10-second scan
+# Default 15-second scan
 aranet-cli scan
 
 # Custom timeout
-aranet-cli scan --timeout 15
+aranet-cli scan --timeout 30
+
+# Verbose output
+aranet-cli scan --verbose
 ```
+
+> **Note:** Aranet devices advertise infrequently to conserve battery. A longer timeout
+> increases the chance of discovering all nearby devices.
 
 Example output:
 
@@ -93,7 +102,14 @@ aranet-cli read 228EB 30F9A
 
 # By UUID
 aranet-cli read "B6F33CE5-4712-5841-C308-B4217CDAFD68"
+
+# Verbose output
+aranet-cli read 228EB --verbose
 ```
+
+The `read` and `monitor` commands perform an internal 15-second scan before connecting.
+Devices that cannot be matched are reported after the successful readings, and the
+command exits with a failure status if any device errored or was not found.
 
 Example output (multi-device):
 
@@ -141,8 +157,84 @@ The monitor command:
 - Performs an initial reading to get device interval and timing
 - Calculates when the next sensor update will occur
 - Schedules readings 3 seconds after each sensor update
+- Adapts automatically when the device interval is changed during a session
+- Posts an `aranetReadingDidUpdate` notification for every reading
 - Continues monitoring until interrupted (Ctrl+C)
 - When monitoring multiple devices, readings interleave as they arrive
+
+### Script and agent mode (`--json`)
+
+All subcommands accept `--json`. In this mode the tool prints machine-readable data on
+**stdout** -- errors included -- and nothing else: no spinners, banners or other progress
+output. Verbose diagnostics are suppressed so stdout always stays parseable.
+
+`--json` is a global flag listed in `aranet-cli --help`, and works before or after the
+subcommand name:
+
+```bash
+# Devices as a JSON array
+aranet-cli scan --json
+aranet-cli --json scan
+
+# Readings as a JSON array (one object per successfully read device)
+aranet-cli read 228EB 30F9A --json
+
+# Newline-delimited JSON, one object per reading, until interrupted
+aranet-cli monitor 228EB --json
+```
+
+Scan output:
+
+```json
+[
+  {
+    "id" : "B6F33CE5-4712-5841-C308-B4217CDAFD68",
+    "name" : "Aranet4 228EB"
+  }
+]
+```
+
+Reading output -- every measurement is a `value`/`unit` pair, and measurements the
+device does not report are omitted:
+
+```json
+[
+  {
+    "age" : { "unit" : "seconds", "value" : 230 },
+    "battery" : { "unit" : "percent", "value" : 89 },
+    "co2" : { "unit" : "ppm", "value" : 1995 },
+    "device" : "Aranet4 228EB",
+    "deviceType" : "Aranet4",
+    "firmwareVersion" : "v1.4.19",
+    "humidity" : { "unit" : "percent", "value" : 56 },
+    "interval" : { "unit" : "seconds", "value" : 300 },
+    "pressure" : { "unit" : "hPa", "value" : 999.5 },
+    "status" : "RED",
+    "temperature" : { "unit" : "C", "value" : 23.95 },
+    "timestamp" : "2026-07-25T16:17:52Z"
+  }
+]
+```
+
+A radiation sensor reports `radiationRate` (µSv/h), `radiationTotal` (µSv) and
+`radiationDuration` (seconds) instead; a radon sensor reports `radonConcentration`
+(Bq/m³). `scan` and `read` print indented JSON, while `monitor` prints one compact
+JSON object per line so the stream can be consumed incrementally. Keys are sorted
+alphabetically for deterministic, diffable output.
+
+Errors are single-line JSON objects on **stdout**, and the exit status is non-zero.
+This covers device and Bluetooth failures as well as argument parsing failures, so a
+script never has to parse human-readable diagnostics:
+
+```json
+{"error":"No matching devices found"}
+{"error":"Device 'kitchen' not found","device":"kitchen"}
+{"error":"Unknown option '--bogus'"}
+```
+
+When some devices succeed and others fail, the data array is printed first, followed by
+one error object per failure. Exit codes are unchanged: `1` for runtime failures, `64`
+for usage errors. `--help` and `--version` keep their regular plain-text output.
 
 ## Technical Details
 
@@ -152,12 +244,15 @@ Unlike many Bluetooth devices, **Aranet4 sensors do not require pairing** for ba
 
 ### Characteristics Used
 
-- **F0CD3001** (Detailed Current Readings) - Primary, no pairing required ✓
-- **F0CD3003** (AR2 Detailed) - For Aranet Radiation, no pairing required ✓
-- **F0CD1503** (Basic Current Readings) - Requires pairing/authentication
-- **F0CD1504** (AR2 Current Readings) - For Aranet2 devices
+Characteristics are tried in this priority order:
 
-The tool automatically selects the best available characteristic based on device type and availability.
+1. **F0CD3001** (Detailed Current Readings) - Aranet4, no pairing required ✓
+2. **F0CD3003** (AR2 Detailed) - Aranet Radiation / Radon, no pairing required ✓
+3. **F0CD1504** (AR2 Current Readings) - Aranet2 and AR2-family devices, requires pairing
+4. **F0CD1503** (Basic Current Readings) - Aranet4 fallback, requires pairing
+
+The tool discovers all characteristics first, then automatically selects the best available
+one based on device type and availability.
 
 ### Swift Foundation Units
 
@@ -182,7 +277,7 @@ If you see "Bluetooth access is not authorized", grant Bluetooth permissions:
 
 ### Device Not Found
 
-If you get "Error: Device not found":
+If you get "Error: No matching devices found" or "Error: Device '...' not found":
 
 1. Run `aranet-cli scan` first to see available devices
 2. Use the exact device name or UUID from the scan results
@@ -214,7 +309,7 @@ If scanning finds no devices:
 
 1. Ensure your Aranet device is powered on and nearby
 2. Make sure "Smart Home integrations" is enabled in the Aranet Home mobile app
-3. Try increasing the scan timeout: `aranet-cli scan --timeout 15`
+3. Try increasing the scan timeout: `aranet-cli scan --timeout 30`
 4. Check if the device is already connected to another application
 
 ## Supported Devices
@@ -224,7 +319,7 @@ If scanning finds no devices:
 | [**Aranet4**](https://aranet.com/en/home/products/aranet4-home) | CO2, temperature, humidity, pressure | Fully supported |
 | [**Aranet Radiation**](https://aranet.com/en/home/products/aranet-radiation-sensor) | Dose rate, cumulative dose, duration | Fully supported |
 | [**Aranet2 HOME**](https://aranet.com/en/home/products/aranet2-home) | Temperature, humidity | Experimental, untested |
-| [**Aranet Radon Plus**](https://aranet.com/en/home/products/aranet-radon-sensor) | Radon concentration | Experimental, untested |
+| [**Aranet Radon Plus**](https://aranet.com/en/home/products/aranet-radon-sensor) | Radon concentration, temperature, humidity, pressure | Experimental, untested |
 
 ## Development
 
@@ -233,11 +328,13 @@ If scanning finds no devices:
 ```text
 Sources/
 ├── AranetKit/           # Reusable library
-│   ├── AranetClient.swift   # CoreBluetooth client
-│   ├── AranetTypes.swift    # Data models and types
-│   └── Units.swift          # Custom measurement units
+│   ├── AranetClient.swift        # CoreBluetooth client
+│   ├── AranetNotifications.swift # NotificationCenter integration
+│   ├── AranetTypes.swift         # Data models and types
+│   └── Units.swift               # Custom measurement units
 └── AranetCli/           # CLI application
-    ├── AranetCli.swift      # CLI interface
+    ├── AranetCli.swift       # CLI interface
+    ├── JsonOutput.swift      # Machine-readable output (--json)
     └── ProgressSpinner.swift # Terminal UI utilities
 ```
 
@@ -248,7 +345,7 @@ The core Bluetooth functionality is available as a Swift package that can be imp
 ```swift
 // In your Package.swift
 dependencies: [
-    .package(url: "https://github.com/heikopanjas/aranet-kit.git", from: "3.2.0")
+    .package(url: "https://github.com/heikopanjas/aranet-kit.git", from: "3.5.0")
 ],
 targets: [
     .target(
@@ -261,9 +358,10 @@ targets: [
 import AranetKit
 
 let client = AranetClient()
+client.verbose = false
 
 // Scan returns [AranetDevice] (pure Swift value types)
-let devices = try await client.scan(timeout: 10.0)
+let devices = try await client.scan(timeout: 15.0)
 
 // Read sensor data
 if let device = devices.first {
@@ -298,6 +396,37 @@ if let device = devices.first {
     }
 }
 ```
+
+Errors thrown by the client are `AranetError` values (`bluetoothUnavailable`,
+`bluetoothUnauthorized`, `bluetoothUnsupported`, `deviceNotFound`, `connectionFailed`,
+`readFailed`, `invalidData`, `timeout`, `pairingRequired`), each with a human-readable
+`description`.
+
+### Reading Notifications
+
+Every reading delivered by `monitor(from:)` is also posted to `NotificationCenter`,
+which is convenient for menu bar apps and other UI-driven consumers that do not want
+to own the async stream:
+
+```swift
+import AranetKit
+
+NotificationCenter.default.addObserver(
+    forName: .aranetReadingDidUpdate,
+    object: nil,
+    queue: .main
+) { notification in
+    guard let device = notification.userInfo?[AranetNotificationKey.device] as? AranetDevice,
+          let reading = notification.userInfo?[AranetNotificationKey.reading] as? AranetReading,
+          let receivedAt = notification.userInfo?[AranetNotificationKey.receivedAt] as? Date
+    else { return }
+
+    print("\(device.name) at \(receivedAt): \(reading.co2 ?? 0) ppm")
+}
+```
+
+The monitoring timer runs in the `.common` run loop mode, so readings keep arriving
+while AppKit menus are being tracked.
 
 ### Building for Development
 

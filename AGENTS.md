@@ -869,15 +869,20 @@ fix: update `KString` with "nested 'quotes'" & $special chars!
 
 **AUTOMATICALLY track version changes using semantic versioning (SemVer).**
 
-The current version is defined in `Sources/AranetCli/AranetCli.swift` in the `CommandConfiguration` as `version: "X.Y.Z"`.
+The current version is defined in `Sources/AranetCli/AranetCli.swift` as the `toolVersion` static constant on the root `AranetCli` command.
 
 ```swift
-static let configuration = CommandConfiguration(
-    commandName: "aranet-cli",
-    abstract: "Command-line tool for Aranet Bluetooth sensors",
-    version: "3.2.0",  // <-- Update this version
-    subcommands: [Scan.self, Read.self, Monitor.self]
-)
+@main
+struct AranetCli: AsyncParsableCommand {
+    /// Current tool version, reported by the root-level `--version` flag.
+    static let toolVersion = "3.5.0"  // <-- Update this version
+
+    static let configuration = CommandConfiguration(
+        commandName: "aranet-cli",
+        abstract: "Command-line tool for Aranet Bluetooth sensors",
+        subcommands: [Scan.self, Read.self, Monitor.self]
+    )
+}
 ```
 
 ### Version Format: MAJOR.MINOR.PATCH
@@ -909,7 +914,7 @@ static let configuration = CommandConfiguration(
 After making ANY code changes:
 
 1. Determine the type of change (fix, feature, or breaking change)
-2. Update the version in `AranetCli.swift` CommandConfiguration accordingly
+2. Update `AranetCli.toolVersion` in `Sources/AranetCli/AranetCli.swift` accordingly
 3. Include the version change in the same commit as the code change
 4. Mention version bump in commit message footer if significant
 
@@ -918,6 +923,64 @@ After making ANY code changes:
 ---
 
 ## Recent Updates & Decisions
+
+### 2026-07-25 (JSON Script and Agent Mode, Version 3.5.0)
+
+- **Minor version bump**: 3.4.0 to 3.5.0
+- **New `--json` flag on every subcommand**: Machine-readable output for scripts and agents
+  - Declared visibly on the root command so it is listed once in `aranet-cli --help`, and repeated as a `help: .hidden` flag in `GlobalOptions` so `aranet-cli <subcommand> --json` still parses without cluttering the subcommand help pages
+  - `GlobalOptions.json` is computed as "hidden flag set OR `--json` present in `CommandLine.arguments`", because swift-argument-parser never passes parent command values down to subcommands
+  - Everything goes to stdout, including errors as single-line JSON objects, so a consumer only has to read one stream; exit codes are unchanged
+  - `scan` emits a JSON array of devices, `read` emits a JSON array of readings, `monitor` emits newline-delimited JSON (one object per reading) so consumers can stream it
+  - `read` emits the data array before any error objects, so a partially failed multi-device read still yields data first
+  - All spinners, banners and status text are suppressed; `--verbose` library diagnostics are also suppressed in JSON mode because they print to stdout and would corrupt the payload
+- **New `AranetCliMain` entry point**: `@main` moved from the `AranetCli` command to a dedicated enum that calls `parseAsRoot()` and intercepts every thrown error
+  - swift-argument-parser prints its own plain-text diagnostics (including usage errors) for anything thrown out of a command, which scripts cannot parse; the interceptor converts them to `{"error": ...}` on stdout when `--json` appears in `CommandLine.arguments`
+  - Exit codes are preserved via `AranetCli.exitCode(for:)` (1 for runtime failures, 64 for usage errors); `--help` and `--version` map to `ExitCode.success` and keep their plain-text output
+  - `Monitor` now throws `ExitCode.failure` instead of rethrowing the stream error, because the error has already been reported and rethrowing produced a duplicate message
+- **New `GlobalOptions` option group**: `--verbose` and `--json` now live in one `ParsableArguments` struct shared by `Scan`, `Read` and `Monitor` via `@OptionGroup`, replacing three duplicated `@Flag var verbose` declarations (DRY)
+  - Exposes `clientVerbose`, `showSpinner` and `showStatusText` computed properties so output decisions live in one place instead of being re-derived in each command
+  - swift-argument-parser has no parent-to-subcommand flag inheritance, so a shared option group is the idiomatic way to make an option "global" across subcommands
+- **New file `Sources/AranetCli/JsonOutput.swift`**: `JsonDevice`, `JsonMeasurement`, `JsonReading` and `JsonError` payloads plus the `JsonOutput` emitter
+  - JSON DTOs live in the CLI target, not in AranetKit, so the library API stays free of a wire format it does not own
+  - Every measurement is emitted as a `{"value": ..., "unit": ...}` pair via the generic `JsonMeasurement<Value>` wrapper, so consumers never have to hardcode unit assumptions; units are `percent`, `seconds`, `ppm`, `C`, `hPa`, `µSv/h`, `µSv` and `Bq/m³`
+  - The `ago` property of `AranetReading` is exposed as `age` in JSON; radiation totals are reported in µSv (not mSv) to match the dose rate unit scale
+  - Optional fields are omitted when the device does not report them, so payload shape identifies the sensor type
+  - `scan` and `read` emit indented JSON; `monitor` emits compact single-line objects for newline-delimited streaming
+  - Keys are sorted alphabetically (`.sortedKeys`): Foundation's `JSONEncoder` cannot preserve property declaration order because it serialises through an unordered dictionary, so alphabetical ordering is the only deterministic, diffable option
+- **Files changed**: Sources/AranetCli/AranetCli.swift, Sources/AranetCli/JsonOutput.swift, README.md, AGENTS.md
+- **Reasoning**: The CLI was interactive-only; spinners and decorative separators made it unusable from scripts and agent tooling without brittle text parsing
+
+### 2026-07-25 (Root-Only Version Flag, Version 3.4.0)
+
+- **Minor version bump**: 3.3.1 to 3.4.0
+- **`--version` is now a root-only global flag**: Removed `version:` from the root `CommandConfiguration` and replaced it with an explicit `@Flag(name: .customLong("version")) var showVersion` on the root `AranetCli` command
+  - swift-argument-parser adds its built-in `--version` flag to the help page of *every* command in the stack when `configuration.version` is non-empty (see `HelpGenerator.versionArgumentDefinition()`), so there is no supported way to hide it from subcommand help while keeping the built-in mechanism
+  - The root command now implements `mutating func run() async throws`, printing `Self.toolVersion` when the flag is set and otherwise throwing `CleanExit.helpRequest(self)` to preserve the previous no-argument behaviour of printing help
+- **Version constant location changed**: The canonical version now lives in `AranetCli.toolVersion`, not in `CommandConfiguration(version:)`; the Semantic Versioning Protocol section above was updated accordingly
+- **Behaviour change**: `aranet-cli <subcommand> --version` is no longer accepted (it was never documented); `aranet-cli --version` continues to work and prints the bare version string
+- **Files changed**: Sources/AranetCli/AranetCli.swift, README.md, AGENTS.md
+- **Reasoning**: Subcommand help pages listed `--version` even though version reporting is a top-level concern, which cluttered the per-command option lists
+
+### 2026-07-25 (README Accuracy Pass, Version 3.3.1)
+
+- **Patch version bump**: 3.3.0 to 3.3.1 (documentation-only change per SemVer protocol)
+- **README corrections**:
+  - Default scan timeout documented as 15s (CLI `--timeout` default and `AranetClient.scan()` default are both 15.0; the previous "10-second" text was stale)
+  - Troubleshooting suggestion changed from `--timeout 15` to `--timeout 30`
+  - SPM dependency version updated from 3.2.0 to 3.3.1 in both installation snippets
+  - Installation heading changed from "Swift Package Manager (library only)" to "Swift Package Manager" because `Package.swift` vends both the `AranetKit` library and the `aranet-cli` executable products
+  - Documented that `read` and `monitor` run an internal 15-second scan and exit with failure on unmatched devices
+  - Characteristic list reordered to match the actual `readingCharacteristicPriority` (F0CD3001, F0CD3003, F0CD1504, F0CD1503)
+  - Device Not Found troubleshooting now quotes the actual CLI error strings
+  - Aranet Radon Plus row now lists temperature, humidity and pressure alongside radon concentration
+  - Project structure tree now includes `AranetNotifications.swift`
+  - Library snippet uses `scan(timeout: 15.0)` and shows `client.verbose`
+  - Added `AranetError` case list and a new "Reading Notifications" section covering `.aranetReadingDidUpdate`, `AranetNotificationKey`, and the `.common` run loop mode behaviour
+  - Added monitor bullets for dynamic interval adaptation and notification posting
+- **Documentation gap noted**: the 2025-12-28 entry below claims the executable is excluded from `products`; `Package.swift` currently exposes `aranet-cli` as an executable product, so the README now reflects the code
+- **Files changed**: README.md, Sources/AranetCli/AranetCli.swift, AGENTS.md
+- **Reasoning**: The README had drifted from the implementation across timeouts, versions, characteristic priority, device capabilities and the notification API added in 3.3.0
 
 ### 2026-07-25 (Version 3.3.0)
 
