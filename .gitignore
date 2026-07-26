@@ -4,6 +4,7 @@
 # Swift Package Manager
 .build/
 .swiftpm/
+dist/
 Package.resolved
 *.xcodeproj
 
@@ -83,4 +84,3 @@ Build/
 
 # Python code
 python-impl/
-

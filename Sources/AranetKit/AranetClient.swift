@@ -52,25 +52,43 @@ public struct AranetUUID {
     // MARK: SAF Tehnika Characteristics
 
     /// Basic current readings characteristic (requires pairing/authentication).
-    public static let characteristicCurrentReadings = CBUUID(string: "F0CD1503-95DA-4F4B-9AC8-AA55D312AF0C")
+    public static let characteristicCurrentReadings = CBUUID(
+        string: "F0CD1503-95DA-4F4B-9AC8-AA55D312AF0C")
 
     /// Detailed current readings characteristic (no pairing required, preferred).
-    public static let characteristicCurrentReadingsDetailed = CBUUID(string: "F0CD3001-95DA-4F4B-9AC8-AA55D312AF0C")
+    public static let characteristicCurrentReadingsDetailed = CBUUID(
+        string: "F0CD3001-95DA-4F4B-9AC8-AA55D312AF0C")
 
     /// Aranet2 current readings characteristic.
-    public static let characteristicCurrentReadingsAR2 = CBUUID(string: "F0CD1504-95DA-4F4B-9AC8-AA55D312AF0C")
+    public static let characteristicCurrentReadingsAR2 = CBUUID(
+        string: "F0CD1504-95DA-4F4B-9AC8-AA55D312AF0C")
 
     /// Aranet2/Radiation detailed current readings characteristic (no pairing required).
-    public static let characteristicCurrentReadingsAR2Detailed = CBUUID(string: "F0CD3003-95DA-4F4B-9AC8-AA55D312AF0C")
+    public static let characteristicCurrentReadingsAR2Detailed = CBUUID(
+        string: "F0CD3003-95DA-4F4B-9AC8-AA55D312AF0C")
 
     /// Measurement interval characteristic (time between sensor updates).
     public static let characteristicInterval = CBUUID(string: "F0CD2002-95DA-4F4B-9AC8-AA55D312AF0C")
 
     /// Seconds since last update characteristic (sensor data age).
-    public static let characteristicSecondsSinceUpdate = CBUUID(string: "F0CD2004-95DA-4F4B-9AC8-AA55D312AF0C")
+    public static let characteristicSecondsSinceUpdate = CBUUID(
+        string: "F0CD2004-95DA-4F4B-9AC8-AA55D312AF0C")
 
     /// Total number of stored readings characteristic (history size).
-    public static let characteristicTotalReadings = CBUUID(string: "F0CD2001-95DA-4F4B-9AC8-AA55D312AF0C")
+    public static let characteristicTotalReadings = CBUUID(
+        string: "F0CD2001-95DA-4F4B-9AC8-AA55D312AF0C")
+
+    /// Priority-ordered list of reading characteristics to try.
+    /// Detailed variants (no pairing required) are preferred over basic ones.
+    public static let readingCharacteristicPriority: [CBUUID] = [
+        characteristicCurrentReadingsDetailed,
+        characteristicCurrentReadingsAR2Detailed,
+        characteristicCurrentReadingsAR2,
+        characteristicCurrentReadings
+    ]
+
+    /// Set of all characteristic UUIDs that provide sensor reading data.
+    public static let readingCharacteristics: Set<CBUUID> = Set(readingCharacteristicPriority)
 }
 
 // MARK: - Aranet Error
@@ -114,7 +132,8 @@ public enum AranetError: Error {
             case .bluetoothUnavailable:
                 return "Bluetooth is unavailable or not ready"
             case .bluetoothUnauthorized:
-                return "Bluetooth access is not authorized. Please grant Bluetooth permissions in System Settings."
+                return
+                    "Bluetooth access is not authorized. Please grant Bluetooth permissions in System Settings."
             case .bluetoothUnsupported:
                 return "Bluetooth is not supported on this device"
             case .deviceNotFound:
@@ -146,63 +165,66 @@ public enum AranetError: Error {
     }
 }
 
+// MARK: - Read Operation (per-peripheral state)
+
+/// Encapsulates all mutable state for a single read operation against one peripheral.
+/// Each concurrent read gets its own instance, preventing cross-device state corruption.
+private class ReadOperation {
+    let peripheral: CBPeripheral
+    var continuation: CheckedContinuation<AranetReading, Error>?
+    var deviceName: String = ""
+    var deviceVersion: String = ""
+    var readingData: Data?
+    var readingCharacteristicUUID: CBUUID?
+    var pendingReads: Set<CBUUID> = []
+    var servicesDiscovered = 0
+    var expectedServices = 0
+    var encryptionErrors = 0
+    var availableReadingChars: Set<CBUUID> = []
+
+    init(peripheral: CBPeripheral) {
+        self.peripheral = peripheral
+    }
+}
+
 // MARK: - Aranet Client
 
 /// Bluetooth Low Energy client for communicating with Aranet sensor devices.
 ///
 /// `AranetClient` provides a high-level async/await API for discovering, connecting to,
 /// and reading data from Aranet Bluetooth sensors (Aranet4, Aranet2, Aranet Radiation,
-/// and Aranet Radon Plus). The client handles CoreBluetooth complexity internally and
-/// presents a clean Swift concurrency interface.
+/// and Aranet Radon Plus). CoreBluetooth is fully encapsulated -- consumers only work
+/// with ``AranetDevice`` and ``AranetReading`` types.
 ///
-/// The client runs on the main actor to satisfy CoreBluetooth's threading requirements.
-/// All public methods are safe to call from any context and will automatically dispatch
-/// to the main actor as needed.
+/// The client supports concurrent monitoring of multiple devices. Each read operation
+/// maintains isolated state so simultaneous reads do not interfere with each other.
 ///
 /// Example usage:
 /// ```swift
 /// let client = AranetClient()
-/// client.verbose = true  // Enable debug logging
-///
-/// // Scan for devices
 /// let devices = try await client.scan(timeout: 5.0)
 ///
-/// // Read current sensor values
 /// if let device = devices.first {
 ///     let reading = try await client.readCurrentReadings(from: device)
-///     print("CO2: \\(reading.co2 ?? 0) ppm")
+///     print("CO2: \(reading.co2 ?? 0) ppm")
 /// }
 /// ```
-///
-/// - Note: This class uses `@unchecked Sendable` because CoreBluetooth types are not
-///   Sendable, but the implementation ensures thread-safe access through main actor isolation.
 public class AranetClient: NSObject, @unchecked Sendable {
+    // swift-format-ignore: NeverUseImplicitlyUnwrappedOptionals
     private var centralManager: CBCentralManager!
-    private var peripheral: CBPeripheral?
-    private var continuation: CheckedContinuation<AranetReading, Error>?
+
+    // Scan state
     private var scanContinuation: CheckedContinuation<[CBPeripheral], Error>?
     private var bluetoothReadyContinuation: CheckedContinuation<Void, Error>?
     private var discoveredPeripherals: [CBPeripheral] = []
 
-    private var deviceName: String = ""
-    private var deviceVersion: String = ""
-    private var readingData: Data?
-    private var readingCharacteristicUUID: CBUUID?
-    private var pendingReads: Set<CBUUID> = []
-    private var servicesDiscovered = 0
-    private var expectedServices = 0
-    private var encryptionErrors = 0
+    // Maps public AranetDevice.id -> CBPeripheral for internal use
+    private var knownPeripherals: [UUID: CBPeripheral] = [:]
 
-    // Track which reading characteristics are available
-    private var availableReadingChars: Set<CBUUID> = []
+    // Per-peripheral read state keyed by peripheral.identifier
+    private var activeOperations: [UUID: ReadOperation] = [:]
 
     /// Enables verbose debug logging to console.
-    ///
-    /// When set to `true`, the client will print detailed information about Bluetooth
-    /// operations including scanning, connection status, service discovery, and data reads.
-    /// Useful for troubleshooting connection issues or understanding device behavior.
-    ///
-    /// Default is `false`.
     public var verbose: Bool = false
 
     public override init() {
@@ -254,30 +276,11 @@ public class AranetClient: NSObject, @unchecked Sendable {
 
     /// Scans for nearby Aranet Bluetooth devices.
     ///
-    /// Performs a Bluetooth Low Energy scan looking for Aranet devices advertising their
-    /// service UUIDs. The scan automatically stops after the specified timeout period.
-    ///
-    /// - Parameter timeout: Maximum time to scan in seconds. Default is 10.0 seconds.
-    ///   Aranet devices advertise infrequently to conserve battery, so longer timeouts
-    ///   improve discovery reliability.
-    ///
-    /// - Returns: Array of discovered `CBPeripheral` objects representing Aranet devices.
-    ///   The array may be empty if no devices are found within the timeout period.
-    ///
-    /// - Throws: `AranetError` if Bluetooth is unavailable or unauthorized.
-    ///
-    /// - Note: Devices must be powered on and within Bluetooth range to be discovered.
-    ///   The scan looks for both current and legacy Aranet service UUIDs.
-    ///
-    /// Example:
-    /// ```swift
-    /// let client = AranetClient()
-    /// let devices = try await client.scan(timeout: 10.0)
-    /// for device in devices {
-    ///     print("Found: \\(device.name ?? "Unknown")")
-    /// }
-    /// ```
-    public func scan(timeout: TimeInterval = 10.0) async throws -> [CBPeripheral] {
+    /// - Parameter timeout: Maximum time to scan in seconds. Default is 15.0 seconds.
+    /// - Returns: Array of discovered ``AranetDevice`` values.
+    /// - Throws: ``AranetError`` if Bluetooth is unavailable or unauthorized.
+    @MainActor
+    public func scan(timeout: TimeInterval = 15.0) async throws -> [AranetDevice] {
         try await waitForBluetoothReady()
 
         discoveredPeripherals.removeAll()
@@ -286,7 +289,8 @@ public class AranetClient: NSObject, @unchecked Sendable {
             print("[DEBUG] Starting BLE scan for \(timeout) seconds...")
         }
 
-        return try await withCheckedThrowingContinuation { [weak self] continuation in
+        let peripherals: [CBPeripheral] = try await withCheckedThrowingContinuation {
+            [weak self] continuation in
             guard let self = self else { return }
 
             self.scanContinuation = continuation
@@ -305,75 +309,50 @@ public class AranetClient: NSObject, @unchecked Sendable {
                 self.scanContinuation = nil
             }
         }
+
+        for peripheral in peripherals {
+            knownPeripherals[peripheral.identifier] = peripheral
+        }
+
+        return peripherals.map { AranetDevice(id: $0.identifier, name: $0.name ?? "Unknown") }
     }
 
     /// Reads current sensor measurements from an Aranet device.
     ///
-    /// Connects to the specified device (if not already connected), discovers its services
-    /// and characteristics, then reads the current sensor data. The method automatically
-    /// selects the best available reading characteristic based on device capabilities.
+    /// Connects to the specified device, discovers its services and characteristics,
+    /// then reads the current sensor data. Supports concurrent reads from multiple devices.
     ///
-    /// For Aranet4 and similar devices, the detailed characteristic (F0CD3001) is preferred
-    /// as it provides complete sensor data without requiring Bluetooth pairing.
-    ///
-    /// - Parameter peripheral: The `CBPeripheral` to read from, typically obtained from `scan()`.
-    ///
-    /// - Returns: An `AranetReading` struct containing all available sensor measurements,
-    ///   device information, and metadata (battery, interval, age, etc.).
-    ///
-    /// - Throws: `AranetError` for various failure conditions:
-    ///   - `.connectionFailed`: Could not connect to the device
-    ///   - `.readFailed`: Could not read characteristic data
-    ///   - `.invalidData`: Received data could not be parsed
-    ///   - `.timeout`: Operation took too long (30 second timeout)
-    ///   - `.pairingRequired`: Device requires pairing (rare, only for encrypted characteristics)
-    ///
-    /// - Note: The method includes a 30-second timeout. If the operation takes longer,
-    ///   it will throw `.timeout`. The device connection is automatically closed after reading.
-    ///
-    /// Example:
-    /// ```swift
-    /// let client = AranetClient()
-    /// let devices = try await client.scan()
-    /// if let device = devices.first {
-    ///     let reading = try await client.readCurrentReadings(from: device)
-    ///     print("CO2: \\(reading.co2 ?? 0) ppm")
-    ///     print("Temperature: \\(reading.temperature ?? 0) °C")
-    ///     print("Battery: \\(reading.battery)%")
-    /// }
-    /// ```
-    public func readCurrentReadings(from peripheral: CBPeripheral) async throws -> AranetReading {
+    /// - Parameter device: The ``AranetDevice`` to read from, obtained from ``scan(timeout:)``.
+    /// - Returns: An ``AranetReading`` containing all available sensor measurements.
+    /// - Throws: ``AranetError`` for connection, read, or timeout failures.
+    @MainActor
+    public func readCurrentReadings(from device: AranetDevice) async throws -> AranetReading {
         try await waitForBluetoothReady()
 
-        // Reset state
-        self.deviceName = ""
-        self.deviceVersion = ""
-        self.readingData = nil
-        self.readingCharacteristicUUID = nil
-        self.pendingReads = Set()
-        self.servicesDiscovered = 0
-        self.expectedServices = 0
-        self.encryptionErrors = 0
-        self.availableReadingChars = Set()
+        guard let peripheral = knownPeripherals[device.id] else {
+            throw AranetError.deviceNotFound
+        }
 
-        self.peripheral = peripheral
+        let operation = ReadOperation(peripheral: peripheral)
+        activeOperations[device.id] = operation
         peripheral.delegate = self
 
         if verbose == true {
-            print("[DEBUG] Starting read from device: \(peripheral.name ?? "Unknown") (\(peripheral.identifier))")
+            print(
+                "[DEBUG] Starting read from device: \(peripheral.name ?? "Unknown") (\(peripheral.identifier))"
+            )
             print("[DEBUG] Current connection state: \(peripheral.state.rawValue)")
         }
 
         return try await withCheckedThrowingContinuation { [weak self] continuation in
             guard let self = self else { return }
 
-            self.continuation = continuation
+            operation.continuation = continuation
 
             if peripheral.state != .connected {
                 if verbose == true {
                     print("[DEBUG] Connecting to peripheral...")
                 }
-                // Request pairing/bonding by specifying notification options
                 let options: [String: Any] = [
                     CBConnectPeripheralOptionNotifyOnConnectionKey: true,
                     CBConnectPeripheralOptionNotifyOnDisconnectionKey: true
@@ -384,7 +363,7 @@ public class AranetClient: NSObject, @unchecked Sendable {
                 if verbose == true {
                     print("[DEBUG] Already connected, discovering services...")
                 }
-                peripheral.discoverServices(nil)  // Discover ALL services
+                peripheral.discoverServices(nil)
             }
 
             Task { @MainActor [weak self] in
@@ -392,25 +371,23 @@ public class AranetClient: NSObject, @unchecked Sendable {
 
                 // Check for encryption errors after a short delay
                 try? await Task.sleep(nanoseconds: 5_000_000_000)
-                if self.continuation != nil && self.encryptionErrors > 0 && self.readingData == nil {
+                if let op = self.activeOperations[device.id],
+                    op.continuation != nil && op.encryptionErrors > 0 && op.readingData == nil
+                {
                     if self.verbose == true {
                         print("[DEBUG] Detected encryption errors with no data - pairing required")
                     }
-                    self.continuation?.resume(throwing: AranetError.pairingRequired)
-                    self.continuation = nil
-                    self.disconnect()
+                    self.failOperation(op, with: AranetError.pairingRequired, disconnect: true)
                     return
                 }
 
                 // Final timeout after 30 seconds
                 try? await Task.sleep(nanoseconds: 25_000_000_000)
-                if self.continuation != nil {
+                if let op = self.activeOperations[device.id], op.continuation != nil {
                     if self.verbose == true {
                         print("[DEBUG] Operation timed out after 30 seconds")
                     }
-                    self.continuation?.resume(throwing: AranetError.timeout)
-                    self.continuation = nil
-                    self.disconnect()
+                    self.failOperation(op, with: AranetError.timeout, disconnect: true)
                 }
             }
         }
@@ -418,32 +395,14 @@ public class AranetClient: NSObject, @unchecked Sendable {
 
     /// Monitors an Aranet device with periodic automatic updates.
     ///
-    /// This method performs an initial reading to determine the device's measurement interval,
-    /// then schedules subsequent readings to occur 3 seconds after each expected sensor update.
-    /// The timing is adaptive and uses the device's reported interval and age for accurate synchronization.
+    /// Performs an initial reading to determine the device's measurement interval,
+    /// then schedules subsequent readings 3 seconds after each expected sensor update.
+    /// Multiple devices can be monitored concurrently.
     ///
-    /// - Parameters:
-    ///   - peripheral: The connected peripheral to monitor
-    ///
-    /// - Returns: An async stream of sensor readings
-    ///
-    /// - Note: The stream will continue indefinitely until the task is cancelled or an error occurs.
-    ///         Use a `for await` loop to consume the readings.
-    ///
-    /// Example:
-    /// ```swift
-    /// let stream = client.monitor(from: peripheral)
-    /// for await result in stream {
-    ///     switch result {
-    ///     case .success(let reading):
-    ///         print(reading.formatOutput())
-    ///     case .failure(let error):
-    ///         print("Error: \\(error)")
-    ///     }
-    /// }
-    /// ```
+    /// - Parameter device: The ``AranetDevice`` to monitor, obtained from ``scan(timeout:)``.
+    /// - Returns: An async stream of sensor readings.
     @MainActor
-    public func monitor(from peripheral: CBPeripheral) -> AsyncStream<Result<AranetReading, Error>> {
+    public func monitor(from device: AranetDevice) -> AsyncStream<Result<AranetReading, Error>> {
         return AsyncStream { continuation in
             Task { @MainActor [weak self] in
                 guard let self = self else {
@@ -452,22 +411,20 @@ public class AranetClient: NSObject, @unchecked Sendable {
                 }
 
                 do {
-                    // Initial reading
                     if self.verbose == true {
                         print("[DEBUG] Performing initial reading for monitoring setup...")
                     }
 
-                    let initialReading = try await self.readCurrentReadings(from: peripheral)
+                    let initialReading = try await self.readCurrentReadings(from: device)
                     continuation.yield(.success(initialReading))
+                    AranetNotifications.postReadingDidUpdate(device: device, reading: initialReading)
 
-                    // Check if we have interval information
                     guard let interval = initialReading.interval, let ago = initialReading.ago else {
                         continuation.yield(.failure(AranetError.invalidData))
                         continuation.finish()
                         return
                     }
 
-                    // Calculate next update time - wait until next sensor update + 3s
                     let timeUntilNextUpdate = Int(interval) - Int(ago)
                     let firstReadDelay = timeUntilNextUpdate + 3
 
@@ -477,9 +434,8 @@ public class AranetClient: NSObject, @unchecked Sendable {
                         print("[DEBUG] First reading in \(firstReadDelay) seconds...")
                     }
 
-                    // Continue monitoring with recursive reads
                     await self.monitoringLoop(
-                        from: peripheral,
+                        from: device,
                         interval: TimeInterval(interval),
                         initialDelay: TimeInterval(firstReadDelay),
                         continuation: continuation
@@ -496,10 +452,9 @@ public class AranetClient: NSObject, @unchecked Sendable {
         }
     }
 
-    /// Internal monitoring loop that schedules periodic reads
     @MainActor
     private func monitoringLoop(
-        from peripheral: CBPeripheral,
+        from device: AranetDevice,
         interval: TimeInterval,
         initialDelay: TimeInterval,
         continuation: AsyncStream<Result<AranetReading, Error>>.Continuation
@@ -508,14 +463,8 @@ public class AranetClient: NSObject, @unchecked Sendable {
         var currentInterval = interval
 
         while Task.isCancelled == false {
-            // Wait for the specified interval using Timer on main actor
-            await withCheckedContinuation { (timerContinuation: CheckedContinuation<Void, Never>) in
-                Timer.scheduledTimer(withTimeInterval: currentDelay, repeats: false) { _ in
-                    timerContinuation.resume()
-                }
-            }
+            await wait(for: currentDelay)
 
-            // Check cancellation after timer
             if Task.isCancelled == true {
                 continuation.finish()
                 return
@@ -526,10 +475,10 @@ public class AranetClient: NSObject, @unchecked Sendable {
                     print("[DEBUG] Reading sensor data...")
                 }
 
-                let reading = try await self.readCurrentReadings(from: peripheral)
+                let reading = try await self.readCurrentReadings(from: device)
                 continuation.yield(.success(reading))
+                AranetNotifications.postReadingDidUpdate(device: device, reading: reading)
 
-                // Update interval from device (user may have changed it)
                 if let newInterval = reading.interval {
                     if currentInterval != TimeInterval(newInterval) && self.verbose == true {
                         print("[DEBUG] Device interval changed: \(Int(currentInterval))s -> \(newInterval)s")
@@ -537,10 +486,7 @@ public class AranetClient: NSObject, @unchecked Sendable {
                     currentInterval = TimeInterval(newInterval)
                 }
 
-                // Calculate next delay: wait for one full interval from now, plus 3 seconds
-                // This ensures we read 3 seconds after the next sensor update
                 if let ago = reading.ago {
-                    // Time until next sensor update
                     let timeUntilNextUpdate = currentInterval - TimeInterval(ago)
                     currentDelay = timeUntilNextUpdate + 3.0
 
@@ -550,7 +496,6 @@ public class AranetClient: NSObject, @unchecked Sendable {
                     }
                 }
                 else {
-                    // Fallback: use current interval + 3 seconds
                     currentDelay = currentInterval + 3.0
                     if self.verbose == true {
                         print("[DEBUG] Age not available, using current interval + 3s")
@@ -570,9 +515,66 @@ public class AranetClient: NSObject, @unchecked Sendable {
         continuation.finish()
     }
 
-    private func disconnect() {
-        if let peripheral = peripheral {
-            centralManager.cancelPeripheralConnection(peripheral)
+    @MainActor
+    private func wait(for delay: TimeInterval) async {
+        await withCheckedContinuation { (timerContinuation: CheckedContinuation<Void, Never>) in
+            let timer = Timer(timeInterval: delay, repeats: false) { timer in
+                timer.invalidate()
+                timerContinuation.resume()
+            }
+            RunLoop.main.add(timer, forMode: .common)
+        }
+    }
+
+    private func disconnect(_ peripheral: CBPeripheral) {
+        centralManager.cancelPeripheralConnection(peripheral)
+    }
+
+    private func failOperation(
+        _ operation: ReadOperation, with error: Error, disconnect shouldDisconnect: Bool = false
+    ) {
+        let id = operation.peripheral.identifier
+        operation.continuation?.resume(throwing: error)
+        operation.continuation = nil
+        activeOperations.removeValue(forKey: id)
+        if shouldDisconnect == true {
+            disconnect(operation.peripheral)
+        }
+    }
+
+    private func failAllOperations(with error: Error) {
+        for (_, operation) in activeOperations {
+            operation.continuation?.resume(throwing: error)
+            operation.continuation = nil
+        }
+        activeOperations.removeAll()
+    }
+
+    private func completeReading(for operation: ReadOperation) {
+        guard let data = operation.readingData else {
+            failOperation(operation, with: AranetError.invalidData)
+            return
+        }
+
+        do {
+            let name =
+                operation.deviceName.isEmpty
+                ? (operation.peripheral.name ?? "Unknown")
+                : operation.deviceName
+            let reading = try parseReading(
+                data: data,
+                name: name,
+                version: operation.deviceVersion,
+                characteristicUUID: operation.readingCharacteristicUUID
+            )
+            let id = operation.peripheral.identifier
+            operation.continuation?.resume(returning: reading)
+            operation.continuation = nil
+            activeOperations.removeValue(forKey: id)
+            disconnect(operation.peripheral)
+        }
+        catch {
+            failOperation(operation, with: error, disconnect: true)
         }
     }
 }
@@ -589,26 +591,25 @@ extension AranetClient: CBCentralManagerDelegate {
             let error = AranetError.bluetoothUnauthorized
             bluetoothReadyContinuation?.resume(throwing: error)
             bluetoothReadyContinuation = nil
-            continuation?.resume(throwing: error)
-            continuation = nil
+            failAllOperations(with: error)
         }
         else if central.state == .unsupported {
             let error = AranetError.bluetoothUnsupported
             bluetoothReadyContinuation?.resume(throwing: error)
             bluetoothReadyContinuation = nil
-            continuation?.resume(throwing: error)
-            continuation = nil
+            failAllOperations(with: error)
         }
         else if central.state != .unknown && central.state != .resetting {
             bluetoothReadyContinuation?.resume(throwing: AranetError.bluetoothUnavailable)
             bluetoothReadyContinuation = nil
-            continuation?.resume(throwing: AranetError.bluetoothUnavailable)
-            continuation = nil
+            failAllOperations(with: AranetError.bluetoothUnavailable)
         }
     }
 
+    // swift-format-ignore: AlwaysUseLowerCamelCase
     public func centralManager(
-        _ central: CBCentralManager, didDiscover peripheral: CBPeripheral, advertisementData: [String: Any], rssi RSSI: NSNumber
+        _ central: CBCentralManager, didDiscover peripheral: CBPeripheral,
+        advertisementData: [String: Any], rssi RSSI: NSNumber
     ) {
         if discoveredPeripherals.contains(where: { $0.identifier == peripheral.identifier }) == false {
             if verbose == true {
@@ -623,22 +624,27 @@ extension AranetClient: CBCentralManagerDelegate {
             print("[DEBUG] Connected to peripheral: \(peripheral.name ?? "Unknown")")
             print("[DEBUG] Discovering services...")
         }
-        peripheral.discoverServices(nil)  // Discover ALL services
+        peripheral.discoverServices(nil)
     }
 
-    public func centralManager(_ central: CBCentralManager, didFailToConnect peripheral: CBPeripheral, error: Error?) {
+    public func centralManager(
+        _ central: CBCentralManager, didFailToConnect peripheral: CBPeripheral, error: Error?
+    ) {
         if verbose == true {
             print("[DEBUG] Failed to connect: \(error?.localizedDescription ?? "unknown error")")
         }
-        continuation?.resume(throwing: error ?? AranetError.connectionFailed)
-        continuation = nil
+        guard let operation = activeOperations[peripheral.identifier] else { return }
+        failOperation(operation, with: error ?? AranetError.connectionFailed)
     }
 
-    public func centralManager(_ central: CBCentralManager, didDisconnectPeripheral peripheral: CBPeripheral, error: Error?) {
+    public func centralManager(
+        _ central: CBCentralManager, didDisconnectPeripheral peripheral: CBPeripheral, error: Error?
+    ) {
         if verbose == true {
-            print("[DEBUG] Disconnected from peripheral: \(error?.localizedDescription ?? "clean disconnect")")
+            print(
+                "[DEBUG] Disconnected from peripheral: \(error?.localizedDescription ?? "clean disconnect")"
+            )
         }
-        self.peripheral = nil
     }
 }
 
@@ -646,6 +652,9 @@ extension AranetClient: CBCentralManagerDelegate {
 
 extension AranetClient: CBPeripheralDelegate {
     public func peripheral(_ peripheral: CBPeripheral, didDiscoverServices error: Error?) {
+        let id = peripheral.identifier
+        guard let operation = activeOperations[id] else { return }
+
         if verbose == true {
             print("[DEBUG] Discovered services: \(peripheral.services?.count ?? 0)")
         }
@@ -654,12 +663,11 @@ extension AranetClient: CBPeripheralDelegate {
             if verbose == true {
                 print("[DEBUG] Error discovering services: \(error?.localizedDescription ?? "unknown")")
             }
-            continuation?.resume(throwing: error ?? AranetError.readFailed)
-            continuation = nil
+            failOperation(operation, with: error ?? AranetError.readFailed)
             return
         }
 
-        expectedServices = services.count
+        operation.expectedServices = services.count
 
         for service in services {
             if verbose == true {
@@ -669,114 +677,84 @@ extension AranetClient: CBPeripheralDelegate {
         }
     }
 
-    public func peripheral(_ peripheral: CBPeripheral, didDiscoverCharacteristicsFor service: CBService, error: Error?) {
-        servicesDiscovered += 1
+    public func peripheral(
+        _ peripheral: CBPeripheral, didDiscoverCharacteristicsFor service: CBService, error: Error?
+    ) {
+        let id = peripheral.identifier
+        guard let operation = activeOperations[id] else { return }
+
+        operation.servicesDiscovered += 1
 
         if verbose == true {
-            print("[DEBUG] Discovered \(service.characteristics?.count ?? 0) characteristics for service: \(service.uuid)")
-            print("[DEBUG] Services discovered: \(servicesDiscovered)/\(expectedServices)")
+            print(
+                "[DEBUG] Discovered \(service.characteristics?.count ?? 0) characteristics for service: \(service.uuid)"
+            )
+            print(
+                "[DEBUG] Services discovered: \(operation.servicesDiscovered)/\(operation.expectedServices)"
+            )
         }
 
         guard error == nil, let characteristics = service.characteristics else {
             if verbose == true {
-                print("[DEBUG] Error discovering characteristics: \(error?.localizedDescription ?? "unknown")")
+                print(
+                    "[DEBUG] Error discovering characteristics: \(error?.localizedDescription ?? "unknown")")
             }
             return
         }
 
         for characteristic in characteristics {
             if verbose == true {
-                print("[DEBUG] Found characteristic: \(characteristic.uuid) (properties: \(characteristic.properties.rawValue))")
+                print(
+                    "[DEBUG] Found characteristic: \(characteristic.uuid) (properties: \(characteristic.properties.rawValue))"
+                )
             }
 
             if characteristic.uuid == AranetUUID.characteristicDeviceName {
                 if verbose == true {
                     print("[DEBUG] Reading device name...")
                 }
-                pendingReads.insert(characteristic.uuid)
+                operation.pendingReads.insert(characteristic.uuid)
                 peripheral.readValue(for: characteristic)
             }
             else if characteristic.uuid == AranetUUID.characteristicSoftwareRevision {
                 if verbose == true {
                     print("[DEBUG] Reading software revision...")
                 }
-                pendingReads.insert(characteristic.uuid)
+                operation.pendingReads.insert(characteristic.uuid)
                 peripheral.readValue(for: characteristic)
             }
-            else if characteristic.uuid == AranetUUID.characteristicCurrentReadingsDetailed {
+            else if AranetUUID.readingCharacteristics.contains(characteristic.uuid) {
                 if verbose == true {
-                    print("[DEBUG] Found detailed current readings characteristic")
+                    print("[DEBUG] Found reading characteristic: \(characteristic.uuid)")
                 }
-                availableReadingChars.insert(characteristic.uuid)
-            }
-            else if characteristic.uuid == AranetUUID.characteristicCurrentReadings {
-                if verbose == true {
-                    print("[DEBUG] Found basic current readings characteristic")
-                }
-                availableReadingChars.insert(characteristic.uuid)
-            }
-            else if characteristic.uuid == AranetUUID.characteristicCurrentReadingsAR2Detailed {
-                if verbose == true {
-                    print("[DEBUG] Found AR2 detailed current readings characteristic")
-                }
-                availableReadingChars.insert(characteristic.uuid)
-            }
-            else if characteristic.uuid == AranetUUID.characteristicCurrentReadingsAR2 {
-                if verbose == true {
-                    print("[DEBUG] Found AR2 current readings characteristic")
-                }
-                availableReadingChars.insert(characteristic.uuid)
+                operation.availableReadingChars.insert(characteristic.uuid)
             }
         }
 
         // Only check if we've discovered all services
-        if servicesDiscovered == expectedServices {
+        if operation.servicesDiscovered == operation.expectedServices {
             if verbose == true {
-                print("[DEBUG] All services discovered. Available reading characteristics: \(availableReadingChars.count)")
+                print(
+                    "[DEBUG] All services discovered. Available reading characteristics: \(operation.availableReadingChars.count)"
+                )
             }
 
-            // Now decide which characteristic to read based on priority
-            var readingCharToRead: CBUUID? = nil
+            let readingCharToRead = AranetUUID.readingCharacteristicPriority
+                .first { operation.availableReadingChars.contains($0) }
 
-            // Priority: Detailed (Aranet4) > AR2 Detailed > AR2 Basic > Basic (Aranet4)
-            if availableReadingChars.contains(AranetUUID.characteristicCurrentReadingsDetailed) {
-                readingCharToRead = AranetUUID.characteristicCurrentReadingsDetailed
-                if verbose == true {
-                    print("[DEBUG] Will read detailed current readings (F0CD3001)")
-                }
-            }
-            else if availableReadingChars.contains(AranetUUID.characteristicCurrentReadingsAR2Detailed) {
-                readingCharToRead = AranetUUID.characteristicCurrentReadingsAR2Detailed
-                if verbose == true {
-                    print("[DEBUG] Will read AR2 detailed current readings (F0CD3003)")
-                }
-            }
-            else if availableReadingChars.contains(AranetUUID.characteristicCurrentReadingsAR2) {
-                readingCharToRead = AranetUUID.characteristicCurrentReadingsAR2
-                if verbose == true {
-                    print("[DEBUG] Will read AR2 current readings (F0CD1504)")
-                }
-            }
-            else if availableReadingChars.contains(AranetUUID.characteristicCurrentReadings) {
-                readingCharToRead = AranetUUID.characteristicCurrentReadings
-                if verbose == true {
-                    print("[DEBUG] Will read basic current readings (F0CD1503)")
-                }
+            if verbose == true, let selected = readingCharToRead {
+                print("[DEBUG] Will read from characteristic: \(selected)")
             }
 
-            // Now initiate the reads
             if let readingChar = readingCharToRead {
-                readingCharacteristicUUID = readingChar
-                // Find the characteristic and read it
+                operation.readingCharacteristicUUID = readingChar
                 for service in peripheral.services ?? [] {
                     if let characteristics = service.characteristics {
-                        for char in characteristics {
-                            if char.uuid == readingChar {
-                                pendingReads.insert(char.uuid)
-                                peripheral.readValue(for: char)
-                                if verbose == true {
-                                    print("[DEBUG] Reading from \(char.uuid)")
-                                }
+                        for char in characteristics where char.uuid == readingChar {
+                            operation.pendingReads.insert(char.uuid)
+                            peripheral.readValue(for: char)
+                            if verbose == true {
+                                print("[DEBUG] Reading from \(char.uuid)")
                             }
                         }
                     }
@@ -784,68 +762,64 @@ extension AranetClient: CBPeripheralDelegate {
             }
 
             if verbose == true {
-                print("[DEBUG] Pending reads: \(pendingReads.count)")
+                print("[DEBUG] Pending reads: \(operation.pendingReads.count)")
             }
 
-            // If we have reading data but no more mandatory reads, complete
-            if readingData != nil && pendingReads.isEmpty {
+            if operation.readingData != nil && operation.pendingReads.isEmpty {
                 if verbose == true {
                     print("[DEBUG] Have reading data and no pending reads, completing...")
                 }
-                completeReading()
+                completeReading(for: operation)
             }
-            else if pendingReads.isEmpty {
+            else if operation.pendingReads.isEmpty {
                 if verbose == true {
                     print("[DEBUG] All services discovered but no reading characteristics found!")
                 }
-                continuation?.resume(throwing: AranetError.readFailed)
-                continuation = nil
+                failOperation(operation, with: AranetError.readFailed)
             }
         }
     }
 
-    public func peripheral(_ peripheral: CBPeripheral, didUpdateValueFor characteristic: CBCharacteristic, error: Error?) {
-        // Check for authentication/encryption errors
+    public func peripheral(
+        _ peripheral: CBPeripheral, didUpdateValueFor characteristic: CBCharacteristic, error: Error?
+    ) {
+        let id = peripheral.identifier
+        guard let operation = activeOperations[id] else { return }
+
         if let error = error {
             let nsError = error as NSError
 
-            // Check if this is an authentication error (code 15 = insufficient encryption/authentication)
             if nsError.domain == "CBATTErrorDomain" && nsError.code == 15 {
                 if verbose == true {
                     print(
                         "[DEBUG] Authentication error on characteristic \(characteristic.uuid) - this is expected for F0CD1503, we use F0CD3001 instead"
                     )
                 }
-                pendingReads.remove(characteristic.uuid)
-
-                // Don't treat this as fatal if we have data from another characteristic
-                // The detailed characteristic (F0CD3001) doesn't require pairing
+                operation.pendingReads.remove(characteristic.uuid)
                 return
             }
 
-            // Other errors
             if verbose == true {
-                print("[DEBUG] Error reading characteristic \(characteristic.uuid): \(error.localizedDescription)")
+                print(
+                    "[DEBUG] Error reading characteristic \(characteristic.uuid): \(error.localizedDescription)"
+                )
             }
-            pendingReads.remove(characteristic.uuid)
+            operation.pendingReads.remove(characteristic.uuid)
             return
         }
 
         guard let data = characteristic.value else {
             if verbose == true {
-                print("[DEBUG] ⚠️ No data returned for characteristic \(characteristic.uuid) - this may indicate pairing required")
+                print("[DEBUG] No data returned for characteristic \(characteristic.uuid)")
             }
-            pendingReads.remove(characteristic.uuid)
+            operation.pendingReads.remove(characteristic.uuid)
 
-            // If this is one of the reading characteristics and we got no data, treat as encryption issue
-            if characteristic.uuid == AranetUUID.characteristicCurrentReadingsDetailed
-                || characteristic.uuid == AranetUUID.characteristicCurrentReadings
-                || characteristic.uuid == AranetUUID.characteristicCurrentReadingsAR2
-                || characteristic.uuid == AranetUUID.characteristicCurrentReadingsAR2Detailed
-            {
-                encryptionErrors += 1
+            if AranetUUID.readingCharacteristics.contains(characteristic.uuid) {
+                operation.encryptionErrors += 1
                 if verbose == true {
-                    print("[DEBUG] ⚠️ Reading characteristic returned no data - likely needs pairing (count: \(encryptionErrors))")
+                    print(
+                        "[DEBUG] Reading characteristic returned no data - likely needs pairing (count: \(operation.encryptionErrors))"
+                    )
                 }
             }
             return
@@ -855,45 +829,44 @@ extension AranetClient: CBPeripheralDelegate {
             print("[DEBUG] Read characteristic \(characteristic.uuid): \(data.count) bytes")
         }
 
-        pendingReads.remove(characteristic.uuid)
+        operation.pendingReads.remove(characteristic.uuid)
 
         if characteristic.uuid == AranetUUID.characteristicDeviceName {
-            deviceName = String(data: data, encoding: .utf8) ?? ""
+            operation.deviceName = String(data: data, encoding: .utf8) ?? ""
             if verbose == true {
-                print("[DEBUG] Device name: \(deviceName)")
+                print("[DEBUG] Device name: \(operation.deviceName)")
             }
         }
         else if characteristic.uuid == AranetUUID.characteristicSoftwareRevision {
-            deviceVersion = String(data: data, encoding: .utf8) ?? ""
+            operation.deviceVersion = String(data: data, encoding: .utf8) ?? ""
             if verbose == true {
-                print("[DEBUG] Software version: \(deviceVersion)")
+                print("[DEBUG] Software version: \(operation.deviceVersion)")
             }
         }
-        else if characteristic.uuid == AranetUUID.characteristicCurrentReadingsDetailed
-            || characteristic.uuid == AranetUUID.characteristicCurrentReadings
-            || characteristic.uuid == AranetUUID.characteristicCurrentReadingsAR2
-            || characteristic.uuid == AranetUUID.characteristicCurrentReadingsAR2Detailed
-        {
-            readingData = data
+        else if AranetUUID.readingCharacteristics.contains(characteristic.uuid) {
+            operation.readingData = data
             if verbose == true {
-                print("[DEBUG] Got reading data: \(data.map { String(format: "%02X", $0) }.joined(separator: " "))")
+                print(
+                    "[DEBUG] Got reading data: \(data.map { String(format: "%02X", $0) }.joined(separator: " "))"
+                )
             }
         }
 
         if verbose == true {
-            print("[DEBUG] Pending reads remaining: \(pendingReads.count)")
+            print("[DEBUG] Pending reads remaining: \(operation.pendingReads.count)")
         }
 
-        if pendingReads.isEmpty && readingData != nil {
+        if operation.pendingReads.isEmpty && operation.readingData != nil {
             if verbose == true {
                 print("[DEBUG] All reads complete, parsing data...")
             }
-            completeReading()
+            completeReading(for: operation)
         }
     }
 
-    // Add delegate methods for pairing/authentication monitoring
-    public func peripheral(_ peripheral: CBPeripheral, didModifyServices invalidatedServices: [CBService]) {
+    public func peripheral(
+        _ peripheral: CBPeripheral, didModifyServices invalidatedServices: [CBService]
+    ) {
         if verbose == true {
             print("[DEBUG] Peripheral services were modified")
         }
@@ -905,29 +878,71 @@ extension AranetClient: CBPeripheralDelegate {
         }
     }
 
-    private func completeReading() {
-        guard let data = readingData else {
-            continuation?.resume(throwing: AranetError.invalidData)
-            continuation = nil
-            return
+    // MARK: - Debug Helpers
+
+    private func printHexDump(
+        _ data: Data, title: String, fields: [(range: String, description: String)]
+    ) {
+        print("[DEBUG] === \(title) (\(data.count) bytes) ===")
+
+        for field in fields {
+            let parts = field.range.split(separator: "-")
+            guard let start = Int(parts[0]) else { continue }
+            let end = parts.count > 1 ? (Int(parts[1]) ?? start) : start
+
+            guard start < data.count else { continue }
+            let clampedEnd = min(end, data.count - 1)
+
+            let bytes = data[start ... clampedEnd]
+            let hex = bytes.map { String(format: "%02X", $0) }.joined(separator: " ")
+
+            var leValue: UInt64 = 0
+            for (i, byte) in bytes.enumerated() {
+                leValue |= UInt64(byte) << (i * 8)
+            }
+
+            let range = field.range.padding(toLength: 5, withPad: " ", startingAt: 0)
+            let hexVal = "\(hex) = \(leValue)"
+            print(
+                "[DEBUG] \(range)  \(hexVal.padding(toLength: 36, withPad: " ", startingAt: 0)) \(field.description)"
+            )
         }
 
-        do {
-            // Use peripheral name as fallback if deviceName is empty
-            let name = deviceName.isEmpty ? (peripheral?.name ?? "Unknown") : deviceName
-            let reading = try parseReading(data: data, name: name, version: deviceVersion, characteristicUUID: readingCharacteristicUUID)
-            continuation?.resume(returning: reading)
-            continuation = nil
-            disconnect()
-        }
-        catch {
-            continuation?.resume(throwing: error)
-            continuation = nil
-            disconnect()
-        }
+        print("[DEBUG] ===")
     }
 
-    private func parseReading(data: Data, name: String, version: String, characteristicUUID: CBUUID?) throws -> AranetReading {
+    private static let aranet4Fields: [(range: String, description: String)] = [
+        ("0-1", "CO2 (UInt16 LE, ppm)"),
+        ("2-3", "Temperature (UInt16 LE, raw/20)"),
+        ("4-5", "Pressure (UInt16 LE, raw/10 hPa)"),
+        ("6", "Humidity (UInt8, %)"),
+        ("7", "Battery (UInt8, %)"),
+        ("8", "Status (0=Err, 1=G, 2=Y, 3=R)"),
+        ("9-10", "Interval (UInt16 LE, sec)"),
+        ("11-12", "Ago (UInt16 LE, sec)")
+    ]
+
+    private static let radiationFields: [(range: String, description: String)] = [
+        ("0-1", "Device type + H"),
+        ("2-3", "Interval (UInt16 LE, sec)"),
+        ("4-5", "Ago (UInt16 LE, sec)"),
+        ("6", "Battery (UInt8, %)"),
+        ("7-10", "Rate (UInt32 LE, nSv/h)"),
+        ("11-18", "Total (UInt64 LE, nSv)"),
+        ("19-26", "Duration (UInt64 LE, sec)"),
+        ("27", "Status (0x05=G, 0x0A=Y, 0x0B=R)"),
+        ("28-35", "Total dose (UInt64 LE, uSv)"),
+        ("36-43", "Realtime duration (UInt64 LE, sec, 60s granularity)"),
+        ("44-47", "Reserved (zero)")
+    ]
+
+    // MARK: - Data Parsing
+
+    private func parseReading(
+        data: Data, name: String, version: String, characteristicUUID: CBUUID?
+    )
+        throws -> AranetReading
+    {
         var offset = 0
 
         func readUInt16LE() -> UInt16 {
@@ -954,7 +969,6 @@ extension AranetClient: CBPeripheralDelegate {
             return value
         }
 
-        // Check if this is F0CD1504 or F0CD3003 (AR2 characteristics) which support multiple device types
         if characteristicUUID == AranetUUID.characteristicCurrentReadingsAR2
             || characteristicUUID == AranetUUID.characteristicCurrentReadingsAR2Detailed
         {
@@ -963,111 +977,69 @@ extension AranetClient: CBPeripheralDelegate {
             }
 
             let deviceTypeByte = readUInt8()
-            offset = 0 // Reset offset to parse from beginning
+            offset = 0
 
-            // Aranet Radiation (Nucleo) - first byte = 4
             if deviceTypeByte == 4 {
-                // F0CD1504 format: <HHHBIQQB (28 bytes) - includes interval/ago in first bytes
-                // F0CD3003 format: 48 bytes - interval/ago may be at different positions
+                // F0CD1504 (28 bytes): rate stored as nSv/h * 10
+                // F0CD3003 (48+ bytes): rate stored as nSv/h directly
+                let rateDivisor: Double
                 if data.count == 28 {
-                    // F0CD1504 format (28 bytes)
-                    guard data.count >= 28 else {
-                        throw AranetError.invalidData
-                    }
-
-                    // Format: <HHHBIQQB (28 bytes)
-                    // Python format unpacks bytes 0-27, where first H (bytes 0-1) includes device type byte
-                    //   value[0] = bytes 0-1 (H) - includes device type byte (0x0004)
-                    //   value[1] = bytes 2-3 (H) - interval
-                    //   value[2] = bytes 4-5 (H) - ago
-                    //   value[3] = byte 6 (B) - battery
-                    //   value[4] = bytes 7-10 (I) - rate
-                    //   value[5] = bytes 11-18 (Q) - total
-                    //   value[6] = bytes 19-26 (Q) - duration
-                    //   value[7] = byte 27 (B) - unknown
-                    // Skip bytes 0-1 (device type + first H from Python struct)
-                    offset = 2
-                    let interval = readUInt16LE()    // Read bytes 2-3 (value[1] from Python)
-                    let ago = readUInt16LE()         // Read bytes 4-5 (value[2] from Python)
-                    let battery = readUInt8()        // Read byte 6 (value[3] from Python)
-                    let radiationRateRaw = readUInt32LE()  // Read bytes 7-10 (value[4] from Python)
-                    let radiationTotal = readUInt64LE()    // Read bytes 11-18 (value[5] from Python)
-                    let radiationDuration = readUInt64LE() // Read bytes 19-26 (value[6] from Python)
-
-                    // radiation_rate is stored as nSv/h * 10, divide by 10 to get nSv/h
-                    let radiationRateValue = Double(radiationRateRaw) / 10.0
-                    let radiationRate = Measurement(value: radiationRateValue, unit: UnitRadiationDose.nanosieverts)
-                    let radiationTotalMeasurement = Measurement(value: Double(radiationTotal), unit: UnitRadiationDose.nanosieverts)
-
-                    return AranetReading(
-                        deviceType: .aranetRadiation,
-                        name: name,
-                        version: version,
-                        temperature: nil,
-                        humidity: nil,
-                        co2: nil,
-                        pressure: nil,
-                        radiationRate: radiationRate,
-                        radiationTotal: radiationTotalMeasurement,
-                        radiationDuration: radiationDuration,
-                        radonConcentration: nil,
-                        battery: battery,
-                        status: nil,
-                        interval: interval,
-                        ago: ago
-                    )
+                    rateDivisor = 10.0
                 }
                 else if data.count >= 48 {
-                    // F0CD3003 format (48 bytes) - uses same <HHHBIQQB format as F0CD1504 for first 28 bytes
-                    // Python format <HHHBIQQB unpacks bytes 0-27:
-                    //   value[0] = bytes 0-1 (H) - includes device type byte (0x0004)
-                    //   value[1] = bytes 2-3 (H) - interval
-                    //   value[2] = bytes 4-5 (H) - ago
-                    //   value[3] = byte 6 (B) - battery
-                    //   value[4] = bytes 7-10 (I) - rate
-                    //   value[5] = bytes 11-18 (Q) - total
-                    //   value[6] = bytes 19-26 (Q) - duration
-                    //   value[7] = byte 27 (B) - unknown
-                    // Skip bytes 0-1 (device type + first H from Python struct)
-                    offset = 2
-                    let interval = readUInt16LE()    // Read bytes 2-3 (value[1] from Python)
-                    let ago = readUInt16LE()         // Read bytes 4-5 (value[2] from Python)
-                    let battery = readUInt8()        // Read byte 6 (value[3] from Python)
-
-                    if verbose == true {
-                        print("[DEBUG] F0CD3003 parsing: interval=\(interval), ago=\(ago), battery=\(battery)")
-                    }
-                    let radiationRateRaw = readUInt32LE()  // Bytes 7-10
-                    let radiationTotal = readUInt64LE()    // Bytes 11-18
-                    let radiationDuration = readUInt64LE() // Bytes 19-26
-                    // Remaining 20 bytes are extended data, ignore for now
-
-                    // For F0CD3003, rate is stored as nSv/h (NOT multiplied by 10 like F0CD1504)
-                    let radiationRateValue = Double(radiationRateRaw)
-                    let radiationRate = Measurement(value: radiationRateValue, unit: UnitRadiationDose.nanosieverts)
-                    let radiationTotalMeasurement = Measurement(value: Double(radiationTotal), unit: UnitRadiationDose.nanosieverts)
-
-                    return AranetReading(
-                        deviceType: .aranetRadiation,
-                        name: name,
-                        version: version,
-                        temperature: nil,
-                        humidity: nil,
-                        co2: nil,
-                        pressure: nil,
-                        radiationRate: radiationRate,
-                        radiationTotal: radiationTotalMeasurement,
-                        radiationDuration: radiationDuration,
-                        radonConcentration: nil,
-                        battery: battery,
-                        status: nil,
-                        interval: interval,
-                        ago: ago
-                    )
+                    rateDivisor = 1.0
                 }
                 else {
                     throw AranetError.invalidData
                 }
+
+                if verbose == true {
+                    printHexDump(data, title: "Aranet Radiation", fields: Self.radiationFields)
+                }
+
+                offset = 2
+                let interval = readUInt16LE()
+                let ago = readUInt16LE()
+                let battery = readUInt8()
+
+                if verbose == true {
+                    print("[DEBUG] Radiation parsing: interval=\(interval), ago=\(ago), battery=\(battery)")
+                }
+
+                let radiationRateRaw = readUInt32LE()
+                let radiationTotal = readUInt64LE()
+                let radiationDuration = readUInt64LE()
+
+                // Byte 27: status display color (different encoding than Aranet4)
+                let statusByte = readUInt8()
+                let status = AranetStatusColor.fromRadiationByte(statusByte)
+                if verbose == true {
+                    print(
+                        "[DEBUG] Radiation status byte: 0x\(String(format: "%02X", statusByte)) -> \(status?.name ?? "unknown")"
+                    )
+                }
+
+                let radiationRate = Measurement(
+                    value: Double(radiationRateRaw) / rateDivisor,
+                    unit: UnitRadiationDose.nanosieverts
+                )
+                let radiationTotalMeasurement = Measurement(
+                    value: Double(radiationTotal),
+                    unit: UnitRadiationDose.nanosieverts
+                )
+
+                return AranetReading(
+                    deviceType: .aranetRadiation,
+                    name: name,
+                    version: version,
+                    radiationRate: radiationRate,
+                    radiationTotal: radiationTotalMeasurement,
+                    radiationDuration: radiationDuration,
+                    battery: battery,
+                    status: status,
+                    interval: interval,
+                    ago: ago
+                )
             }
             // Aranet2 - first byte = 2
             else if deviceTypeByte == 2 {
@@ -1075,16 +1047,13 @@ extension AranetClient: CBPeripheralDelegate {
                     throw AranetError.invalidData
                 }
 
-                // Format: <HHHBHHB
-                // Total size: 10 bytes (device type + 9 bytes of data)
-                // Skip first byte (device type)
                 offset = 1
-                let interval = readUInt16LE()    // Bytes 1-2
-                let ago = readUInt16LE()         // Bytes 3-4
-                let battery = readUInt8()        // Byte 5
-                let tempRaw = readUInt16LE()     // Bytes 6-7
-                let humidity = readUInt8()        // Byte 8
-                let _ = readUInt8()              // Byte 9 - Status byte (bit-packed humidity/temperature status, not currently parsed)
+                let interval = readUInt16LE()
+                let ago = readUInt16LE()
+                let battery = readUInt8()
+                let tempRaw = readUInt16LE()
+                let humidity = readUInt8()
+                let _ = readUInt8()
 
                 let temperatureValue = Double(tempRaw) / 20.0
                 let temperature = Measurement(value: temperatureValue, unit: UnitTemperature.celsius)
@@ -1095,21 +1064,14 @@ extension AranetClient: CBPeripheralDelegate {
                     version: version,
                     temperature: temperature,
                     humidity: humidity,
-                    co2: nil,
-                    pressure: nil,
-                    radiationRate: nil,
-                    radiationTotal: nil,
-                    radiationDuration: nil,
-                    radonConcentration: nil,
                     battery: battery,
-                    status: nil,
                     interval: interval,
                     ago: ago
                 )
             }
             // Aranet Radon - first byte = 3 (not fully implemented yet)
             else if deviceTypeByte == 3 {
-                throw AranetError.invalidData // Radon parsing not yet implemented
+                throw AranetError.invalidData
             }
             else {
                 throw AranetError.invalidData
@@ -1119,6 +1081,10 @@ extension AranetClient: CBPeripheralDelegate {
         else {
             guard data.count >= 7 else {
                 throw AranetError.invalidData
+            }
+
+            if verbose == true {
+                printHexDump(data, title: "Aranet4", fields: Self.aranet4Fields)
             }
 
             offset = 0

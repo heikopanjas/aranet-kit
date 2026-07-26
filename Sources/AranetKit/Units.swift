@@ -59,6 +59,7 @@ public final class UnitRadiationDose: Dimension, @unchecked Sendable {
     )
 
     /// Returns the base unit for radiation dose (nanosieverts).
+    // swift-format-ignore: NeverForceUnwrap
     public override class func baseUnit() -> Self {
         return nanosieverts as! Self
     }
@@ -112,6 +113,7 @@ public final class UnitRadioactivity: Dimension, @unchecked Sendable {
     )
 
     /// Returns the base unit for radioactivity concentration (Bq/m³).
+    // swift-format-ignore: NeverForceUnwrap
     public override class func baseUnit() -> Self {
         return becquerelsPerCubicMeter as! Self
     }

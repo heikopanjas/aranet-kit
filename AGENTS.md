@@ -1,6 +1,6 @@
 # Project Instructions for AI Coding Agents
 
-**Last updated:** 2025-12-10 17:00
+**Last updated:** 2026-07-26
 
 <!-- {mission} -->
 
@@ -146,6 +146,32 @@ if !isEnabled { }        // Wrong
 
 **Rationale**: Explicit comparisons make code intent clearer and improve readability, especially for developers from other language backgrounds.
 
+### DRY Principle (Don't Repeat Yourself)
+
+**Eliminate duplication ruthlessly.** When the same logic, pattern, or sequence appears in more than one place, extract it into a shared helper (function, computed property, or extension method).
+
+**What to extract:**
+
+- Identical or near-identical code blocks across commands or methods
+- Repeated multi-line patterns (e.g. cleanup sequences, error formatting)
+- Constant sets or lists used in multiple comparisons
+- Formatting logic reused across switch cases or device types
+
+**How to extract:**
+
+- **Shared logic across CLI commands**: File-private free functions or extensions in AranetCli.swift
+- **Repeated UUID/constant sets**: Static properties on the relevant type (e.g. `AranetUUID.readingCharacteristics`)
+- **Repeated formatting**: Private computed properties on the data type
+- **Near-duplicate branches**: Parameterize the difference (e.g. a divisor or flag), share the rest
+
+**When NOT to extract:**
+
+- Superficial similarity where the intent differs (coincidental duplication)
+- One-time code that merely looks similar but serves distinct purposes
+- Extraction that would obscure the code's intent or add unnecessary abstraction
+
+**Rationale**: A single source of truth for each piece of knowledge reduces bugs from inconsistent updates and keeps the codebase smaller and easier to maintain.
+
 ### Guard Statements
 
 **Prefer single guard statements over multiple guard conditions.**
@@ -182,7 +208,7 @@ guard let data = data,
 
 ### Library Structure
 
-**aranetcli** follows Swift Package Manager best practices with clear separation between library and executable:
+**aranet-cli** follows Swift Package Manager best practices with clear separation between library and executable:
 
 - **AranetKit** (library): Core Bluetooth client, data models, reusable components
 - **AranetCli** (executable): CLI application, command handling, user interface
@@ -192,9 +218,9 @@ guard let data = data,
 ```swift
 // Service: Stateless data fetching
 public class AranetClient {
-    func readCurrentReadings(from deviceId: String, verbose: Bool) async throws -> AranetReading {
-        // Bluetooth communication
-    }
+    func scan(timeout: TimeInterval) async throws -> [AranetDevice]
+    func readCurrentReadings(from device: AranetDevice) async throws -> AranetReading
+    func monitor(from device: AranetDevice) -> AsyncStream<Result<AranetReading, Error>>
 }
 
 // CLI: Command handling and presentation
@@ -202,6 +228,18 @@ public class AranetClient {
 struct AranetCLI: AsyncParsableCommand {
     @Command var read: ReadCommand
     @Command var scan: ScanCommand
+}
+```
+
+### Public API Surface
+
+The library's public API uses only value types (`AranetDevice`, `AranetReading`). CoreBluetooth is fully encapsulated inside `AranetClient` -- consumers never need to `import CoreBluetooth`.
+
+```swift
+// AranetDevice abstracts CBPeripheral
+public struct AranetDevice: Identifiable, Hashable, Sendable {
+    public let id: UUID
+    public let name: String
 }
 ```
 
@@ -215,6 +253,10 @@ public class AranetClient: NSObject, @unchecked Sendable {
     // Bluetooth communication on main actor
 }
 ```
+
+### Concurrent Read Isolation
+
+Each read operation gets its own `ReadOperation` instance keyed by peripheral UUID in `activeOperations: [UUID: ReadOperation]`. This prevents cross-device state corruption when reading from multiple peripherals simultaneously.
 
 ### Data Models
 
@@ -307,6 +349,7 @@ AranetKit defines custom `Dimension` subclasses for radiation and radioactivity 
 Measures ionizing radiation dose with base unit nanosieverts (nSv).
 
 **Available units:**
+
 - `.nanosieverts` (nSv) - base unit, coefficient 1.0
 - `.microsieverts` (µSv) - coefficient 1000.0
 - `.millisieverts` (mSv) - coefficient 1,000,000.0
@@ -328,6 +371,7 @@ print("Total dose: \(totalMsv.value) mSv")
 ```
 
 **Typical values:**
+
 - Background radiation: 50-200 nSv/h (0.05-0.2 µSv/h)
 - Annual limit (public): ~100 µSv
 
@@ -336,6 +380,7 @@ print("Total dose: \(totalMsv.value) mSv")
 Measures radon gas concentration with base unit becquerels per cubic meter (Bq/m³).
 
 **Available units:**
+
 - `.becquerelsPerCubicMeter` (Bq/m³) - base unit, SI standard
 - `.picocuriesPerLiter` (pCi/L) - coefficient 37.0, common in USA
 
@@ -351,6 +396,7 @@ print("Radon: \(radonPci.value) pCi/L")
 ```
 
 **Reference levels:**
+
 - WHO action level: 100 Bq/m³
 - EPA action level: 148 Bq/m³ (4 pCi/L)
 
@@ -394,9 +440,9 @@ Aranet devices use Bluetooth Low Energy (BLE) characteristics to transmit sensor
 
 #### F0CD3001 - Detailed Current Readings (13 bytes)
 
-**Characteristic UUID:** `F0CD3001-95DA-4F4B-9AC8-AA55D312AF0C`  
-**Python struct format:** `<HHHBBBHH`  
-**Total size:** 13 bytes  
+**Characteristic UUID:** `F0CD3001-95DA-4F4B-9AC8-AA55D312AF0C`
+**Python struct format:** `<HHHBBBHH`
+**Total size:** 13 bytes
 **Pairing required:** No
 
 **Byte Structure:**
@@ -433,9 +479,9 @@ let pressure = Double(pressureRaw) / 10.0
 
 #### F0CD1503 - Basic Current Readings (6 bytes)
 
-**Characteristic UUID:** `F0CD1503-95DA-4F4B-9AC8-AA55D312AF0C`  
-**Python struct format:** `<HHHBBB`  
-**Total size:** 6 bytes  
+**Characteristic UUID:** `F0CD1503-95DA-4F4B-9AC8-AA55D312AF0C`
+**Python struct format:** `<HHHBBB`
+**Total size:** 6 bytes
 **Pairing required:** Yes
 
 **Byte Structure:**
@@ -459,9 +505,9 @@ Byte 8:      Status (UInt8) - status color/alert (0=Error, 1=Green, 2=Yellow, 3=
 
 #### F0CD1504 - Current Readings (10 bytes)
 
-**Characteristic UUID:** `F0CD1504-95DA-4F4B-9AC8-AA55D312AF0C`  
-**Python struct format:** `<HHHBHHB`  
-**Total size:** 10 bytes (device type byte + 9 data bytes)  
+**Characteristic UUID:** `F0CD1504-95DA-4F4B-9AC8-AA55D312AF0C`
+**Python struct format:** `<HHHBHHB`
+**Total size:** 10 bytes (device type byte + 9 data bytes)
 **Pairing required:** Yes (for F0CD1504), No (for F0CD3003 detailed variant)
 
 **Byte Structure:**
@@ -499,9 +545,9 @@ let statusTemperature = Status(rawValue: (statusRaw & 0b1100) >> 2)
 
 #### F0CD3003 - Detailed Current Readings (48 bytes)
 
-**Characteristic UUID:** `F0CD3003-95DA-4F4B-9AC8-AA55D312AF0C`  
-**Python struct format:** `<HHHBIQQB` (for first 28 bytes)  
-**Total size:** 48 bytes  
+**Characteristic UUID:** `F0CD3003-95DA-4F4B-9AC8-AA55D312AF0C`
+**Python struct format:** `<HHHBIQQB` (for first 28 bytes)
+**Total size:** 48 bytes
 **Pairing required:** No
 
 **Byte Structure (48 bytes total):**
@@ -523,8 +569,13 @@ Byte 6:     Battery (UInt8) - battery level percentage (0-100) (value[3] in Pyth
 Bytes 7-10: Rate (UInt32 LE) - radiation dose rate in nSv/h (NOT multiplied by 10) (value[4] in Python)
 Bytes 11-18: Total (UInt64 LE) - cumulative radiation dose in nSv (value[5] in Python)
 Bytes 19-26: Duration (UInt64 LE) - measurement duration in seconds (value[6] in Python)
-Byte 27:    Unknown/padding (UInt8) - (value[7] in Python)
-Bytes 28-47: Extended data (20 bytes, currently unused)
+Byte 27:     Status (UInt8) - status display color (value[7] in Python, unused there)
+             Encoding differs from Aranet4: 0x05=Green, 0x0A=Yellow, 0x0B=Red
+Bytes 28-35: Total dose (UInt64 LE) - cumulative dose in microsieverts (uSv)
+             Equals floor(total_nSv / 1000), lower-resolution duplicate of bytes 11-18
+Bytes 36-43: Realtime duration (UInt64 LE) - elapsed time in seconds, 60s granularity
+             Equals floor((duration + ago) / 60) * 60, continuously updated unlike bytes 19-26
+Bytes 44-47: Reserved (zero)
 ```
 
 **Note:** The Python struct format `<HHHBIQQB` unpacks bytes 0-27, where the first `H` (bytes 0-1) includes the device type byte. When parsing in Swift, skip bytes 0-1 (set offset = 2), then read interval from bytes 2-3 and ago from bytes 4-5.
@@ -535,6 +586,8 @@ Bytes 28-47: Extended data (20 bytes, currently unused)
 - **Data model**: `radiationRate` in `AranetReading` is stored in nSv/h; `formatOutput()` converts to µSv/h for display
 - **Duration**: Represents total time the sensor has been measuring since last reset (typically 8+ days for long-running sensors)
 - **Total dose**: Cumulative dose since last counter reset, stored in nanosieverts (nSv)
+- **Status**: Byte 27 encodes the status display color using a different scheme than Aranet4 (0x05=Green, 0x0A=Yellow, 0x0B=Red). The Python library reads this byte but does not use it.
+- **Extended data (bytes 28-47)**: Contains lower-resolution duplicates -- total dose in µSv (bytes 28-35) and a real-time duration counter with 60-second granularity (bytes 36-43). Bytes 44-47 are reserved (zero). The Python library ignores all 20 bytes.
 
 **Comparison with F0CD1504:**
 
@@ -664,11 +717,11 @@ swift package generate-documentation --output-path ./docs
 ### Code Quality
 
 ```bash
-# Format code (requires swift-format tool)
-swift-format format --in-place --recursive .
+# Format code with the Xcode-bundled swift-format
+xcrun swift-format format --configuration .swift-format --in-place --recursive Sources
 
-# Lint code (requires swift-format tool)
-swift-format lint --recursive .
+# Lint code; --strict makes findings fail CI
+xcrun swift-format lint --configuration .swift-format --recursive --strict Sources
 
 # Run with sanitizers (debug builds)
 swift build --sanitize=address
@@ -711,13 +764,81 @@ xcodebuild -scheme <scheme_name> -destination 'platform=iOS Simulator,name=iPhon
 # Archive for distribution (requires macOS with Xcode)
 xcodebuild archive -scheme <scheme_name> -archivePath ./build/App.xcarchive
 
-# Build universal binary (macOS)
-swift build -c release --arch arm64 --arch x86_64
+# Verify the arm64 release artifact
+scripts/verify-binary-architecture.sh "$(swift build -c release --show-bin-path)/aranet-cli"
 ```
 
 **Important**: Always use debug builds (`swift build`) during development. Debug builds compile faster and include debugging symbols. Only use release builds (`swift build -c release`) for final testing or deployment.
 
 <!-- {integration} -->
+
+## Release Process
+
+### Workflow and Version Gate
+
+- Direct pushes to `main` are disabled. `.github/workflows/release.yml` runs for pull
+  requests targeting `main`.
+- Open, synchronized, reopened, labeled, and unlabeled pull requests run strict linting,
+  release metadata validation, and an unsigned arm64 packaging dry run.
+- A merged pull request runs the signed and notarized release job from `main` and creates
+  the `v<toolVersion>` tag and GitHub release.
+- `Sources/AranetCli/AranetCli.swift` and the newest released section in `CHANGELOG.md`
+  must contain the same semantic version. The release fails if that tag already exists.
+- Apply the `skip-release` label to changes that do not require a version bump. The
+  validation job reports success while packaging and publishing are skipped. The
+  workflow listens for both label addition and removal so required checks are refreshed.
+- `lint` and `validate` must be required status checks in `main` branch protection.
+
+### Architecture and Artifacts
+
+- All CI binaries are Apple Silicon `arm64`; every build verifies the Mach-O architecture
+  with `scripts/verify-binary-architecture.sh`.
+- Release assets are `aranet-cli-<version>-macos-arm64.tar.gz`,
+  `aranet-cli-<version>.artifactbundle.zip`, and `SHA256SUMS.txt`.
+- The pre-built executable supports Apple Silicon Macs only. Intel users build from source.
+- `AranetKit` is distributed as source through the release tag. Do not publish an
+  `.xcframework` or DocC archive unless this decision changes.
+- `scripts/extract-version.sh`, `scripts/changelog-section.sh`,
+  `scripts/verify-version.sh`, and `scripts/package-release.sh` are the shared release
+  implementation. Keep workflows DRY by updating these helpers rather than duplicating logic.
+
+### Signing and Notarization
+
+- Sign with Developer ID Application, hardened runtime, and a secure timestamp.
+- Authenticate `notarytool` with an App Store Connect API Team Key. Individual API keys
+  cannot notarize Developer ID software.
+- A bare Mach-O executable cannot hold a stapled notarization ticket. The release is
+  notarized but not stapled; Gatekeeper performs an online ticket lookup.
+- Required GitHub Actions repository secrets:
+  - `APPLE_CERTIFICATE_P12_BASE64`
+  - `APPLE_CERTIFICATE_PASSWORD`
+  - `APPLE_SIGNING_IDENTITY`
+  - `APPSTORE_CONNECT_KEY_ID`
+  - `APPSTORE_CONNECT_ISSUER_ID`
+  - `APPSTORE_CONNECT_KEY_P8_BASE64`
+- Never print or persist decoded credentials. The workflow uses an ephemeral keychain and
+  removes the decoded `.p12` and `.p8` files in an unconditional cleanup step.
+- Never expose signing or notarization secrets to pull-request validation or dry-run jobs.
+  Secrets are available only to the post-merge release job running trusted `main` content.
+- Team keys do not expire but can be revoked. Rotate one by revoking it, generating a new
+  Team Key, and replacing the key ID and base64 `.p8` secrets. Developer ID certificates
+  expire and must be re-exported with their private key before expiry.
+
+### Release Helpers
+
+```bash
+# Print the canonical CLI version
+scripts/extract-version.sh
+
+# Verify toolVersion and CHANGELOG agree
+scripts/verify-version.sh
+
+# Extract one release-notes section
+scripts/changelog-section.sh 3.5.1
+
+# Package an already-built signed executable
+scripts/package-release.sh 3.5.1 /path/to/aranet-cli
+```
 
 ## Commit Protocol (CRITICAL)
 
@@ -816,15 +937,20 @@ fix: update `KString` with "nested 'quotes'" & $special chars!
 
 **AUTOMATICALLY track version changes using semantic versioning (SemVer).**
 
-The current version is defined in `Sources/AranetCli/AranetCli.swift` in the `CommandConfiguration` as `version: "X.Y.Z"`.
+The current version is defined in `Sources/AranetCli/AranetCli.swift` as the `toolVersion` static constant on the root `AranetCli` command.
 
 ```swift
-static let configuration = CommandConfiguration(
-    commandName: "aranetcli",
-    abstract: "Command-line tool for Aranet Bluetooth sensors",
-    version: "1.0.0",  // <-- Update this version
-    subcommands: [Scan.self, Read.self, Monitor.self]
-)
+@main
+struct AranetCli: AsyncParsableCommand {
+    /// Current tool version, reported by the root-level `--version` flag.
+    static let toolVersion = "3.5.1"  // <-- Update this version
+
+    static let configuration = CommandConfiguration(
+        commandName: "aranet-cli",
+        abstract: "Command-line tool for Aranet Bluetooth sensors",
+        subcommands: [Scan.self, Read.self, Monitor.self]
+    )
+}
 ```
 
 ### Version Format: MAJOR.MINOR.PATCH
@@ -856,7 +982,7 @@ static let configuration = CommandConfiguration(
 After making ANY code changes:
 
 1. Determine the type of change (fix, feature, or breaking change)
-2. Update the version in `AranetCli.swift` CommandConfiguration accordingly
+2. Update `AranetCli.toolVersion` in `Sources/AranetCli/AranetCli.swift` accordingly
 3. Include the version change in the same commit as the code change
 4. Mention version bump in commit message footer if significant
 
@@ -865,6 +991,229 @@ After making ANY code changes:
 ---
 
 ## Recent Updates & Decisions
+
+### 2026-07-26 (Signed arm64 Releases, Version 3.5.1)
+
+- **Patch version bump**: 3.5.0 to 3.5.1
+- **Release workflow**: Pull requests into `main` now validate metadata and package an
+  unsigned dry run; merged pull requests create signed and notarized GitHub releases
+- **Apple Silicon artifacts**: Debug, release, pre-release, and final release binaries are
+  verified as arm64; Intel users build from source
+- **Distribution**: Releases attach a CLI tarball, executable artifact bundle, and SHA-256
+  checksums; `AranetKit` remains a source package distributed by the release tag
+- **Signing**: Developer ID certificate in an ephemeral keychain with App Store Connect
+  API Team Key notarization; bare executable is not stapled because Mach-O cannot hold a ticket
+- **Version gate**: Shared scripts ensure `toolVersion`, CHANGELOG, and release tags agree
+- **`skip-release` label**: Allows documentation-only PRs to bypass release metadata checks
+  and publishing while keeping the required validation check green
+- **Strict lint restored**: Reusable `lint.yml` runs Xcode's bundled swift-format with
+  `--strict` from both build and release workflows
+- **Files changed**: `.github/workflows/`, `scripts/`, `Sources/`, `.gitignore`,
+  `README.md`, `CHANGELOG.md`, `AGENTS.md`
+- **Reasoning**: Development snapshots were unsigned single-file uploads, version extraction
+  had broken after v3.4.0, and the repository lacked a reproducible production release path
+
+### 2026-07-25 (JSON Script and Agent Mode, Version 3.5.0)
+
+- **Minor version bump**: 3.4.0 to 3.5.0
+- **New `--json` flag on every subcommand**: Machine-readable output for scripts and agents
+  - Declared visibly on the root command so it is listed once in `aranet-cli --help`, and repeated as a `help: .hidden` flag in `GlobalOptions` so `aranet-cli <subcommand> --json` still parses without cluttering the subcommand help pages
+  - `GlobalOptions.json` is computed as "hidden flag set OR `--json` present in `CommandLine.arguments`", because swift-argument-parser never passes parent command values down to subcommands
+  - Everything goes to stdout, including errors as single-line JSON objects, so a consumer only has to read one stream; exit codes are unchanged
+  - `scan` emits a JSON array of devices, `read` emits a JSON array of readings, `monitor` emits newline-delimited JSON (one object per reading) so consumers can stream it
+  - `read` emits the data array before any error objects, so a partially failed multi-device read still yields data first
+  - All spinners, banners and status text are suppressed; `--verbose` library diagnostics are also suppressed in JSON mode because they print to stdout and would corrupt the payload
+- **New `AranetCliMain` entry point**: `@main` moved from the `AranetCli` command to a dedicated enum that calls `parseAsRoot()` and intercepts every thrown error
+  - swift-argument-parser prints its own plain-text diagnostics (including usage errors) for anything thrown out of a command, which scripts cannot parse; the interceptor converts them to `{"error": ...}` on stdout when `--json` appears in `CommandLine.arguments`
+  - Exit codes are preserved via `AranetCli.exitCode(for:)` (1 for runtime failures, 64 for usage errors); `--help` and `--version` map to `ExitCode.success` and keep their plain-text output
+  - `Monitor` now throws `ExitCode.failure` instead of rethrowing the stream error, because the error has already been reported and rethrowing produced a duplicate message
+- **New `GlobalOptions` option group**: `--verbose` and `--json` now live in one `ParsableArguments` struct shared by `Scan`, `Read` and `Monitor` via `@OptionGroup`, replacing three duplicated `@Flag var verbose` declarations (DRY)
+  - Exposes `clientVerbose`, `showSpinner` and `showStatusText` computed properties so output decisions live in one place instead of being re-derived in each command
+  - swift-argument-parser has no parent-to-subcommand flag inheritance, so a shared option group is the idiomatic way to make an option "global" across subcommands
+- **New file `Sources/AranetCli/JsonOutput.swift`**: `JsonDevice`, `JsonMeasurement`, `JsonReading` and `JsonError` payloads plus the `JsonOutput` emitter
+  - JSON DTOs live in the CLI target, not in AranetKit, so the library API stays free of a wire format it does not own
+  - Every measurement is emitted as a `{"value": ..., "unit": ...}` pair via the generic `JsonMeasurement<Value>` wrapper, so consumers never have to hardcode unit assumptions; units are `percent`, `seconds`, `ppm`, `C`, `hPa`, `µSv/h`, `µSv` and `Bq/m³`
+  - The `ago` property of `AranetReading` is exposed as `age` in JSON; radiation totals are reported in µSv (not mSv) to match the dose rate unit scale
+  - Optional fields are omitted when the device does not report them, so payload shape identifies the sensor type
+  - `scan` and `read` emit indented JSON; `monitor` emits compact single-line objects for newline-delimited streaming
+  - Keys are sorted alphabetically (`.sortedKeys`): Foundation's `JSONEncoder` cannot preserve property declaration order because it serialises through an unordered dictionary, so alphabetical ordering is the only deterministic, diffable option
+- **Files changed**: Sources/AranetCli/AranetCli.swift, Sources/AranetCli/JsonOutput.swift, README.md, AGENTS.md
+- **Reasoning**: The CLI was interactive-only; spinners and decorative separators made it unusable from scripts and agent tooling without brittle text parsing
+
+### 2026-07-25 (Root-Only Version Flag, Version 3.4.0)
+
+- **Minor version bump**: 3.3.1 to 3.4.0
+- **`--version` is now a root-only global flag**: Removed `version:` from the root `CommandConfiguration` and replaced it with an explicit `@Flag(name: .customLong("version")) var showVersion` on the root `AranetCli` command
+  - swift-argument-parser adds its built-in `--version` flag to the help page of *every* command in the stack when `configuration.version` is non-empty (see `HelpGenerator.versionArgumentDefinition()`), so there is no supported way to hide it from subcommand help while keeping the built-in mechanism
+  - The root command now implements `mutating func run() async throws`, printing `Self.toolVersion` when the flag is set and otherwise throwing `CleanExit.helpRequest(self)` to preserve the previous no-argument behaviour of printing help
+- **Version constant location changed**: The canonical version now lives in `AranetCli.toolVersion`, not in `CommandConfiguration(version:)`; the Semantic Versioning Protocol section above was updated accordingly
+- **Behaviour change**: `aranet-cli <subcommand> --version` is no longer accepted (it was never documented); `aranet-cli --version` continues to work and prints the bare version string
+- **Files changed**: Sources/AranetCli/AranetCli.swift, README.md, AGENTS.md
+- **Reasoning**: Subcommand help pages listed `--version` even though version reporting is a top-level concern, which cluttered the per-command option lists
+
+### 2026-07-25 (README Accuracy Pass, Version 3.3.1)
+
+- **Patch version bump**: 3.3.0 to 3.3.1 (documentation-only change per SemVer protocol)
+- **README corrections**:
+  - Default scan timeout documented as 15s (CLI `--timeout` default and `AranetClient.scan()` default are both 15.0; the previous "10-second" text was stale)
+  - Troubleshooting suggestion changed from `--timeout 15` to `--timeout 30`
+  - SPM dependency version updated from 3.2.0 to 3.3.1 in both installation snippets
+  - Installation heading changed from "Swift Package Manager (library only)" to "Swift Package Manager" because `Package.swift` vends both the `AranetKit` library and the `aranet-cli` executable products
+  - Documented that `read` and `monitor` run an internal 15-second scan and exit with failure on unmatched devices
+  - Characteristic list reordered to match the actual `readingCharacteristicPriority` (F0CD3001, F0CD3003, F0CD1504, F0CD1503)
+  - Device Not Found troubleshooting now quotes the actual CLI error strings
+  - Aranet Radon Plus row now lists temperature, humidity and pressure alongside radon concentration
+  - Project structure tree now includes `AranetNotifications.swift`
+  - Library snippet uses `scan(timeout: 15.0)` and shows `client.verbose`
+  - Added `AranetError` case list and a new "Reading Notifications" section covering `.aranetReadingDidUpdate`, `AranetNotificationKey`, and the `.common` run loop mode behaviour
+  - Added monitor bullets for dynamic interval adaptation and notification posting
+- **Documentation gap noted**: the 2025-12-28 entry below claims the executable is excluded from `products`; `Package.swift` currently exposes `aranet-cli` as an executable product, so the README now reflects the code
+- **Files changed**: README.md, Sources/AranetCli/AranetCli.swift, AGENTS.md
+- **Reasoning**: The README had drifted from the implementation across timeouts, versions, characteristic priority, device capabilities and the notification API added in 3.3.0
+
+### 2026-07-25 (Version 3.3.0)
+
+- **Minor version bump**: Updated `aranet-cli` to version 3.3.0 for the new monitor-reading notification API and menu-tracking timer fix
+- **Reasoning**: The public notification API is a backward-compatible feature, so it requires a minor SemVer increment
+
+### 2026-05-20 (Monitor Notifications and Menu-Tracking Timers)
+
+- **`Notification.Name.aranetReadingDidUpdate`**: Posted by `monitor(from:)` with `AranetNotificationKey` user info (`device`, `reading`, `receivedAt`)
+- **Monitor timer run loop mode**: `monitoringLoop` waits via `RunLoop.main` `.common` mode so scheduled reads continue while AppKit menus are tracked
+- **Reasoning**: macOS pauses default-mode timers during menu tracking; senor-particle and other menu bar apps need live readings without app-level polling workarounds
+
+### 2026-03-22 12:00 (Publication Preparation)
+
+- **CHANGELOG backfill**: Added entries for v1.0.1 through v3.2.0 using AGENTS.md decision log
+- **GitHub Actions CI**: Created `.github/workflows/build.yml` with macOS-15 runner and Swift 6.2 build jobs
+  - A lint job using bundled `xcrun swift-format` was intended and documented here but was
+    omitted from the workflow; it was restored on 2026-07-26
+- **Lint fixes**: Resolved all 16 swift-format lint violations across Sources/
+  - Added `// swift-format-ignore` for Dimension baseUnit() force cast pattern (Units.swift)
+  - Added `// swift-format-ignore` for CBCentralManager IUO and protocol RSSI parameter (AranetClient.swift)
+  - Fixed force unwrap in hex dump parser and ProgressSpinner timer
+  - Converted for-if to for-where clause in characteristic reading loop
+  - Removed trailing commas from array literals per swift-format config
+  - Auto-formatted indentation, spacing, and line breaks
+- **swift-format config fix**: Removed extra colon from NeverUseImplicitlyUnwrappedOptionals key
+- **README**: Updated SPM dependency version from 3.1.0 to 3.2.0 in both installation examples
+- **Files changed**: .swift-format, CHANGELOG.md, README.md, .github/workflows/build.yml, Sources/ (all files), AGENTS.md
+- **Reasoning**: Prepare package for initial public release on GitHub
+
+### 2026-03-14 15:00 (Aranet Radiation Status + Extended Data Discovery)
+
+- **Discovery 1 - Status (byte 27)**: Contains the status display color for Aranet Radiation devices
+  - Encoding differs from Aranet4 (0/1/2/3): Radiation uses 0x05=Green, 0x0A=Yellow, 0x0B=Red
+  - The Python reference library reads this byte via struct format but silently discards it
+- **Discovery 2 - Extended data (bytes 28-47)**: Fully decoded via empirical analysis (3 readings)
+  - Bytes 28-35 (UInt64 LE): Total dose in microsieverts (µSv) = floor(total_nSv / 1000)
+  - Bytes 36-43 (UInt64 LE): Real-time duration counter in seconds, 60s granularity = floor((duration + ago) / 60) * 60
+  - Bytes 44-47: Reserved (zero)
+  - The Python library ignores all 20 bytes of extended data
+- **Implementation**:
+  - Added `AranetStatusColor.fromRadiationByte(_:)` static factory method for radiation-specific mapping
+  - Radiation parsing now reads byte 27 and maps it to `AranetStatusColor`
+  - Status is included in `AranetReading` and displayed in CLI output for radiation devices
+  - Refactored hex dump into shared `printHexDump(_:title:fields:)` with per-device field tables
+  - Added Aranet4 hex dump support using the same shared helper
+- **Version bump**: 3.1.0 to 3.2.0 (MINOR - new feature, backward compatible)
+- **Files changed**: AranetTypes.swift, AranetClient.swift, AranetCli.swift, AGENTS.md
+- **Reasoning**: Aranet Radiation devices transmit status and extended data that neither the Python library nor our implementation was parsing. Confirmed via empirical testing with 3 consecutive readings from device 30F9A. The extended data (bytes 28-47) contains lower-resolution duplicates of total dose and duration -- not needed for our implementation but now fully documented.
+
+### 2026-03-14 14:00 (DRY Refactoring - Code Deduplication)
+
+- **Added DRY principle** to Swift Coding Conventions in AGENTS.md
+- **AranetClient.swift refactoring**:
+  - Added `readingCharacteristicPriority` (ordered array) and `readingCharacteristics` (derived set) to `AranetUUID`
+  - Added `failOperation(_:with:disconnect:)` helper -- replaces 6 identical cleanup sequences
+  - Consolidated 4 characteristic discovery `else if` blocks into one `readingCharacteristics.contains()` check
+  - Replaced 4-branch priority selection chain with `readingCharacteristicPriority.first(where:)`
+  - Unified duplicate 28-byte and 48-byte radiation parsing into single parameterized block (rateDivisor)
+  - Replaced 2 inline four-UUID disjunctions with `readingCharacteristics.contains()`
+  - Fixed unused variable warning in `failAllOperations`
+  - Removed redundant guard (`data.count == 28` already guarantees `>= 28`)
+- **AranetCli.swift refactoring**:
+  - Added `[AranetDevice].match(queries:)` extension -- eliminates duplicate device matching in Read and Monitor
+  - Added `scanAndMatchDevices(queries:verbose:)` -- eliminates ~30 lines of duplicate scan/spinner/match boilerplate
+  - Added `printError(_:device:)` -- eliminates duplicate AranetError formatting
+  - Extracted 9 computed properties from `formatOutput()` (co2Line, temperatureLine, humidityLine, pressureLine, batteryLine, statusLine, ageLine, radonLine, radiationLines)
+  - Simplified `formatOutput()` switch cases to single-line property concatenations
+  - Refactored `Read.run()` from 65 lines to 40 lines using shared helpers
+  - Refactored `Monitor.run()` from 65 lines to 35 lines using shared helpers
+- **Net reduction**: ~120 lines removed across both files
+- **Files changed**: AranetClient.swift, AranetCli.swift, AGENTS.md
+- **Reasoning**: Multiple exact and near-duplicate code blocks violated DRY, risking inconsistent updates and inflating maintenance burden. Shared helpers provide single sources of truth for device matching, error display, operation cleanup, and characteristic priority.
+
+### 2026-03-14 13:30 (Multi-Device Monitor Command)
+
+- **New feature**: `monitor` command now accepts multiple device arguments
+- **Usage**: `aranetcli monitor 228EB 30F9A` monitors both devices concurrently
+- **Implementation**:
+  - Changed `@Argument var device: String` to `@Argument var devices: [String]`
+  - Single scan, match all requested devices, warn about not-found devices
+  - Concurrent monitoring via `withThrowingTaskGroup` -- one task per device stream
+  - Readings from all devices interleave in the terminal as they arrive
+  - If any stream errors, the group cancels all others and exits
+  - Error messages include device name for identification
+- **Backward compatible**: Single-device usage unchanged (`aranetcli monitor 228EB`)
+- **Files changed**: AranetCli.swift
+- **Reasoning**: Mirrors the multi-device read command pattern. Enables monitoring all sensors from a single terminal session.
+
+### 2026-03-14 13:00 (Multi-Device Read Command)
+
+- **New feature**: `read` command now accepts multiple device arguments
+- **Version bump**: 3.0.0 to 3.1.0 (MINOR - new feature, backward compatible)
+- **Usage**: `aranetcli read 228EB 30F9A` reads from both devices concurrently
+- **Implementation**:
+  - Changed `@Argument var device: String` to `@Argument var devices: [String]`
+  - Single scan, then match all requested devices against results
+  - Concurrent reads via `withTaskGroup` leveraging per-operation state isolation
+  - Reports not-found devices after printing successful readings
+  - Adaptive spinner messages for single vs multiple devices
+- **Backward compatible**: Single-device usage unchanged (`aranetcli read 228EB`)
+- **Error handling**: Partial success supported -- prints results for devices that succeed, reports errors for failures, exits with failure if any device had errors
+- **Files changed**: AranetCli.swift
+- **Reasoning**: The library already supports concurrent reads via `ReadOperation` isolation. Exposing this at the CLI level enables reading all sensors in a single invocation, reducing total time from N sequential scans to one scan + concurrent reads.
+
+### 2026-03-14 12:00 (AranetDevice Abstraction and Concurrent Read Support - BREAKING CHANGE)
+
+- **Major refactoring**: Replaced `CBPeripheral` in all public APIs with new `AranetDevice` value type
+- **Breaking change**: Version bumped from 2.0.0 to 3.0.0 (MAJOR)
+- **New type: `AranetDevice`** (AranetTypes.swift):
+  - Public struct with `id: UUID` and `name: String` (non-optional)
+  - Conforms to `Identifiable`, `Hashable`, `Sendable`
+  - Abstracts CoreBluetooth so consumers never need to `import CoreBluetooth`
+  - Instances created by `scan()`, passed to `readCurrentReadings(from:)` and `monitor(from:)`
+- **Public API changes** (AranetClient.swift):
+  - `scan(timeout:)` now returns `[AranetDevice]` instead of `[CBPeripheral]`
+  - `readCurrentReadings(from:)` now takes `AranetDevice` instead of `CBPeripheral`
+  - `monitor(from:)` now takes `AranetDevice` instead of `CBPeripheral`
+  - Added explicit `@MainActor` annotations on `scan()` and `readCurrentReadings(from:)`
+- **Concurrent read support** (AranetClient.swift):
+  - New `ReadOperation` class encapsulates all per-read mutable state
+  - `activeOperations: [UUID: ReadOperation]` dictionary replaces single-device instance properties
+  - `knownPeripherals: [UUID: CBPeripheral]` maps AranetDevice IDs to CBPeripherals internally
+  - `disconnect(_:)` now takes explicit peripheral parameter
+  - New `failAllOperations(with:)` helper for Bluetooth state errors
+  - New `completeReading(for:)` method takes a `ReadOperation` parameter
+  - All CBPeripheralDelegate callbacks look up the correct `ReadOperation` by peripheral ID
+  - Enables safe concurrent reads from multiple devices without state corruption
+- **CLI changes** (AranetCli.swift):
+  - Updated all commands to use `AranetDevice` instead of `CBPeripheral`
+  - `device.name` is no longer optional (was `peripheral.name?`)
+  - `device.id` replaces `peripheral.identifier`
+  - Renamed local variable `peripheral` to `foundDevice` for clarity
+- **Code cleanup**:
+  - Removed verbose inline byte-format comments from parsing code (documented in AGENTS.md)
+  - Removed explicit `nil` parameters from `AranetReading` init calls (uses defaults)
+  - Removed redundant comments throughout the codebase
+  - Streamlined DocC documentation comments
+- **VSCode launch config** (.vscode/launch.json):
+  - Changed debugger type from "swift" to "lldb"
+  - Added explicit `program` paths for debug and release builds
+- **Migration impact**: External code must replace `CBPeripheral` with `AranetDevice`, use `.id` instead of `.identifier`, and `.name` is now non-optional `String`
+- **Files changed**: AranetTypes.swift, AranetClient.swift, AranetCli.swift, .vscode/launch.json
+- **Reasoning**: Exposing `CBPeripheral` in the public API forced consumers to import CoreBluetooth, leaked framework internals, and prevented concurrent multi-device reads due to shared mutable state. The new `AranetDevice` value type provides a clean, Sendable-safe API surface while per-operation state isolation enables concurrent monitoring of multiple devices.
 
 ### 2025-12-10 17:00 (Swift Foundation Units API - BREAKING CHANGE)
 
@@ -1150,6 +1499,21 @@ After making ANY code changes:
 - **Files updated**: AGENTS.md references to project name, executable name, and directory structure
 - **Consistency**: Package name `AranetCli`, executable `aranetcli`, directory `Sources/aranetcli/`
 - **Reasoning**: Standardizing on `aranetcli` (CLI = Command Line Interface) provides clearer naming and matches the actual build artifacts and source structure
+
+### 2025-12-28 15:00 (Package Structure - Executable Hidden from Dependencies)
+
+- **Updated Package.swift structure**: Removed executable from products array, keeping only AranetKit library exposed
+- **Xcode visibility**: Executable hidden from "Add Package Dependencies" dialog (not in products)
+- **Binary output**: `aranet-cli` (explicit executable product name)
+- **Local usage**: Can still build and run with `swift run aranet-cli`
+- **Package structure**:
+  - Package name: `AranetCli`
+  - Library product: `AranetKit` (public, for dependencies)
+  - Executable product: `aranet-cli` (public, maps to AranetCli target)
+  - Library target: `AranetKit` in `Sources/AranetKit/`
+  - Executable target: `AranetCli` in `Sources/AranetCli/`
+  - Binary output: `aranet-cli`
+- **Reasoning**: Standard pattern for packages providing both library and CLI tool - expose only the library as a product. This prevents the executable from appearing in Xcode's "Add Package Dependencies" dialog while keeping it available for local development.
 
 ### 2025-10-05
 

@@ -7,6 +7,139 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.5.1] - 2026-07-26
+
+### Added
+
+- Signed and notarized arm64 release workflow for pull requests merged into `main`
+- SwiftPM executable artifact bundle, compressed CLI archive, and SHA-256 checksums
+- Reusable strict Swift source lint workflow
+- `skip-release` pull-request label for changes that do not require a release
+- Shared scripts for version validation, architecture checks, and release packaging
+
+### Changed
+
+- `develop` pre-releases now use the canonical `toolVersion` and verify arm64 output
+- Release metadata must match between `AranetCli.toolVersion` and this changelog
+
+### Fixed
+
+- Broken pre-release version extraction after the version moved to `toolVersion`
+
+## [3.5.0] - 2026-07-25
+
+### Added
+
+- `--json` flag on every subcommand for machine-readable output
+- Shared `GlobalOptions` option group for `--verbose` and `--json`
+- Deterministic JSON device, measurement, reading, and error payloads
+
+### Fixed
+
+- Duplicate monitor error output when a stream fails
+
+## [3.4.0] - 2026-07-25
+
+### Changed
+
+- `--version` is now a root-only flag and no longer appears on subcommand help pages
+- The canonical version moved to `AranetCli.toolVersion`
+
+## [3.3.1] - 2026-07-25
+
+### Changed
+
+- Corrected README installation, timeout, device capability, notification, and API documentation
+
+## [3.3.0] - 2026-07-25
+
+### Added
+
+- `Notification.Name.aranetReadingDidUpdate` posted by `monitor(from:)` with device, reading, and receive time in user info
+
+### Fixed
+
+- Monitor scheduling timers now use `RunLoop.main` `.common` mode so readings continue while AppKit menus are tracked
+
+## [3.2.0] - 2026-03-14
+
+### Added
+
+- Aranet Radiation status parsing (byte 27: Green/Yellow/Red display color)
+- Shared `printHexDump(_:title:fields:)` helper with per-device field tables
+- Aranet4 hex dump support using shared helper
+
+### Changed
+
+- Major DRY refactoring reducing ~120 lines across AranetClient and AranetCli
+- Extracted shared helpers: `failOperation`, `readingCharacteristics`, `printError`, `scanAndMatchDevices`
+- Simplified `formatOutput()` with computed properties per measurement line
+- Consolidated characteristic discovery and priority selection logic
+
+### Documented
+
+- Fully decoded Aranet Radiation extended data (bytes 28-47)
+
+## [3.1.0] - 2026-03-14
+
+### Added
+
+- Multi-device read: `aranetcli read 228EB 30F9A` reads concurrently
+- Multi-device monitor: `aranetcli monitor 228EB 30F9A` monitors concurrently
+- Device matching extension `[AranetDevice].match(queries:)`
+- Shared `scanAndMatchDevices` helper eliminates duplicate scan boilerplate
+- Partial success support: prints results for successful devices, reports failures
+
+### Changed
+
+- `@Argument var device: String` changed to `@Argument var devices: [String]`
+- Single scan for all requested devices, then concurrent reads/monitors
+
+## [3.0.0] - 2026-03-14
+
+### Added
+
+- `AranetDevice` value type abstracting `CBPeripheral` (Identifiable, Hashable, Sendable)
+- Concurrent read support via per-device `ReadOperation` isolation
+- `knownPeripherals` dictionary maps AranetDevice IDs to CBPeripherals internally
+
+### Changed
+
+- **BREAKING**: `scan()` returns `[AranetDevice]` instead of `[CBPeripheral]`
+- **BREAKING**: `readCurrentReadings(from:)` takes `AranetDevice` instead of `CBPeripheral`
+- **BREAKING**: `monitor(from:)` takes `AranetDevice` instead of `CBPeripheral`
+- Consumers no longer need to `import CoreBluetooth`
+- `device.name` is non-optional String (was `peripheral.name?`)
+
+### Removed
+
+- Direct `CBPeripheral` exposure in public API
+
+## [2.0.0] - 2025-12-10
+
+### Added
+
+- Swift Foundation `Measurement<Unit>` types for all physical quantities
+- Custom `UnitRadiationDose` dimension (nSv, uSv, mSv, Sv)
+- Custom `UnitRadioactivity` dimension (Bq/m3, pCi/L)
+- New `Units.swift` source file
+
+### Changed
+
+- **BREAKING**: `temperature` changed from `Double?` to `Measurement<UnitTemperature>?`
+- **BREAKING**: `pressure` changed from `Double?` to `Measurement<UnitPressure>?`
+- **BREAKING**: `radiationRate` and `radiationTotal` changed to `Measurement<UnitRadiationDose>?`
+- **BREAKING**: `radonConcentration` changed from `UInt32?` to `Measurement<UnitRadioactivity>?`
+- Primitives retained for dimensionless values (humidity, battery, co2, time)
+
+## [1.0.1] - 2025-12-08
+
+### Fixed
+
+- Monitor command now detects when sensor update interval changes during monitoring
+- Renamed `baseInterval` to `currentInterval` and update from device-reported value each cycle
+- Added verbose logging when interval changes are detected
+
 ## [1.0.0] - 2025-11-22
 
 ### Added
@@ -40,5 +173,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Troubleshooting guide
 - Development setup instructions
 
-[Unreleased]: https://github.com/heikopanjas/aranet-kit/compare/v1.0.0...HEAD
+[Unreleased]: https://github.com/heikopanjas/aranet-kit/compare/v3.5.1...HEAD
+[3.5.1]: https://github.com/heikopanjas/aranet-kit/compare/v3.5.0...v3.5.1
+[3.5.0]: https://github.com/heikopanjas/aranet-kit/compare/v3.4.0...v3.5.0
+[3.4.0]: https://github.com/heikopanjas/aranet-kit/compare/v3.3.1...v3.4.0
+[3.3.1]: https://github.com/heikopanjas/aranet-kit/compare/v3.3.0...v3.3.1
+[3.3.0]: https://github.com/heikopanjas/aranet-kit/compare/v3.2.0...v3.3.0
+[3.2.0]: https://github.com/heikopanjas/aranet-kit/compare/v3.1.0...v3.2.0
+[3.1.0]: https://github.com/heikopanjas/aranet-kit/compare/v3.0.0...v3.1.0
+[3.0.0]: https://github.com/heikopanjas/aranet-kit/compare/v2.0.0...v3.0.0
+[2.0.0]: https://github.com/heikopanjas/aranet-kit/compare/v1.0.1...v2.0.0
+[1.0.1]: https://github.com/heikopanjas/aranet-kit/compare/v1.0.0...v1.0.1
 [1.0.0]: https://github.com/heikopanjas/aranet-kit/releases/tag/v1.0.0

@@ -58,6 +58,19 @@ public enum AranetStatusColor: UInt8, Sendable {
                 return "RED"
         }
     }
+
+    /// Maps Aranet Radiation status byte to a status color.
+    ///
+    /// Aranet Radiation uses a different encoding than Aranet4:
+    /// 0x05 = Green, 0x0A = Yellow, 0x0B = Red.
+    public static func fromRadiationByte(_ byte: UInt8) -> AranetStatusColor? {
+        switch byte {
+            case 0x05: return .green
+            case 0x0A: return .yellow
+            case 0x0B: return .red
+            default: return nil
+        }
+    }
 }
 
 // MARK: - Status Alerts
@@ -79,6 +92,27 @@ public enum AranetStatus: UInt8, Sendable {
             case .dash:
                 return "DASH"
         }
+    }
+}
+
+// MARK: - Device
+
+/// A discovered Aranet Bluetooth device.
+///
+/// This type abstracts away CoreBluetooth internals so consumers never need
+/// to import CoreBluetooth. Instances are created by ``AranetClient/scan(timeout:)``
+/// and passed back to ``AranetClient/readCurrentReadings(from:)`` or
+/// ``AranetClient/monitor(from:)``.
+public struct AranetDevice: Identifiable, Hashable, Sendable {
+    /// The device's unique Bluetooth identifier.
+    public let id: UUID
+
+    /// The device's advertised Bluetooth name (e.g. "Aranet4 1A2B3C").
+    public let name: String
+
+    public init(id: UUID, name: String) {
+        self.id = id
+        self.name = name
     }
 }
 
@@ -179,7 +213,7 @@ public struct AranetReading: Sendable {
     /// Current status indicator color displayed on the device.
     ///
     /// Reflects the device's assessment of measurement quality based on configured thresholds.
-    /// Available on: Aranet4, Aranet Radon Plus
+    /// Available on: Aranet4, Aranet Radiation, Aranet Radon Plus
     public let status: AranetStatusColor?
 
     /// Measurement interval in seconds.

@@ -24,7 +24,9 @@ public class ProgressSpinner {
                 self?.render()
             }
         }
-        RunLoop.current.add(timer!, forMode: .common)
+        if let timer = timer {
+            RunLoop.current.add(timer, forMode: .common)
+        }
     }
 
     public func update(message: String) {

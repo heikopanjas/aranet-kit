@@ -1,0 +1,86 @@
+name: Build
+
+on:
+  push:
+    branches:
+      - develop
+      - "feature/**"
+  pull_request:
+    branches:
+      - develop
+
+jobs:
+  lint:
+    uses: ./.github/workflows/lint.yml
+
+  build:
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: swift-actions/setup-swift@v2
+        with:
+          swift-version: "6.2"
+
+      - name: Build
+        run: |
+          swift build
+          scripts/verify-binary-architecture.sh "$(swift build --show-bin-path)/aranet-cli"
+
+      - name: Build Release
+        run: |
+          swift build -c release
+          scripts/verify-binary-architecture.sh "$(swift build -c release --show-bin-path)/aranet-cli"
+
+  pre-release:
+    if: github.ref == 'refs/heads/develop' && github.event_name == 'push'
+    needs: [build, lint]
+    runs-on: macos-15
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: swift-actions/setup-swift@v2
+        with:
+          swift-version: "6.2"
+
+      - name: Build Release Binary
+        run: swift build -c release --product aranet-cli
+
+      - name: Prepare Binary
+        run: |
+          BINARY="$(swift build -c release --show-bin-path)/aranet-cli"
+          scripts/verify-binary-architecture.sh "$BINARY"
+          cp "$BINARY" aranet-cli
+          chmod +x aranet-cli
+
+      - name: Extract Version
+        id: version
+        run: |
+          VERSION=$(scripts/extract-version.sh)
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+
+      - name: Generate Tag and Name
+        id: meta
+        run: |
+          DATETIME=$(date -u +'%Y%m%d_%H%M%S')
+          DATE=$(date -u +'%Y%m%d')
+          TIME=$(date -u +'%H%M%S')
+          BUILD=${{ github.run_number }}
+          VERSION=${{ steps.version.outputs.version }}
+          TAG="R${VERSION}_BUILD_${BUILD}_${DATETIME}"
+          NAME="aranet-kit-build-${BUILD}-${DATE}-${TIME}"
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+          echo "name=$NAME" >> "$GITHUB_OUTPUT"
+
+      - name: Create Pre-Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "${{ steps.meta.outputs.tag }}" \
+            aranet-cli \
+            --title "${{ steps.meta.outputs.name }}" \
+            --prerelease \
+            --target develop \
+            --generate-notes

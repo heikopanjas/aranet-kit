@@ -14,9 +14,9 @@ let package = Package(
             name: "AranetKit",
             targets: ["AranetKit"]
         ),
-        // Executable product for the CLI
+        // CLI executable
         .executable(
-            name: "aranetcli",
+            name: "aranet-cli",
             targets: ["AranetCli"]
         )
     ],
