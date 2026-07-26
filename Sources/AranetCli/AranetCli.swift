@@ -324,7 +324,7 @@ enum AranetCliMain {
 
 struct AranetCli: AsyncParsableCommand {
     /// Current tool version, reported by the root-level `--version` flag.
-    static let toolVersion = "3.5.1"
+    static let toolVersion = "3.5.2"
 
     /// True when `--json` appears anywhere on the command line.
     ///

@@ -49,13 +49,12 @@ To use the library in your own project, add it to your `Package.swift`:
 
 ```swift
 dependencies: [
-    .package(url: "https://github.com/heikopanjas/aranet-kit.git", from: "3.5.1")
+    .package(url: "https://github.com/heikopanjas/aranet-kit.git", from: "3.5.2")
 ]
 ```
 
-`AranetKit` is distributed as source through each release tag. Releases also contain an
-arm64 executable artifact bundle for build tools that consume SwiftPM binary targets;
-the matching `.binaryTarget` declaration and checksum are included in the release notes.
+`AranetKit` is distributed as source through each release tag. The pre-built CLI is
+distributed separately as a signed and notarized arm64 tarball.
 
 ### Build from source
 
@@ -355,7 +354,7 @@ The core Bluetooth functionality is available as a Swift package that can be imp
 ```swift
 // In your Package.swift
 dependencies: [
-    .package(url: "https://github.com/heikopanjas/aranet-kit.git", from: "3.5.1")
+    .package(url: "https://github.com/heikopanjas/aranet-kit.git", from: "3.5.2")
 ],
 targets: [
     .target(

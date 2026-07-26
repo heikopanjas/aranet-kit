@@ -10,18 +10,22 @@ on:
       - reopened
       - labeled
       - unlabeled
-      - closed
+  push:
+    branches:
+      - main
   workflow_dispatch:
 
 permissions:
-  contents: write
+  contents: read
+  pull-requests: read
 
 concurrency:
-  group: release-${{ github.event.pull_request.number || github.ref }}
-  cancel-in-progress: ${{ github.event.action != 'closed' }}
+  group: release-${{ github.event_name == 'pull_request' && format('pr-{0}', github.event.pull_request.number) || 'publish-main' }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   lint:
+    if: github.event_name == 'pull_request'
     uses: ./.github/workflows/lint.yml
 
   validate:
@@ -38,8 +42,26 @@ jobs:
       - name: Validate release metadata
         id: validate
         env:
-          SKIP_RELEASE: ${{ github.event_name == 'pull_request' && contains(github.event.pull_request.labels.*.name, 'skip-release') }}
+          GH_TOKEN: ${{ github.token }}
+          PR_SKIP_RELEASE: ${{ github.event_name == 'pull_request' && contains(github.event.pull_request.labels.*.name, 'skip-release') }}
         run: |
+          if [[ "${{ github.event_name }}" == "workflow_dispatch" && "$GITHUB_REF" != "refs/heads/main" ]]; then
+            echo "error: manual releases must be dispatched from main" >&2
+            exit 1
+          fi
+
+          SKIP_RELEASE="$PR_SKIP_RELEASE"
+          if [[ "${{ github.event_name }}" == "push" ]]; then
+            SKIP_RELEASE=$(gh api \
+              "repos/$GITHUB_REPOSITORY/commits/$GITHUB_SHA/pulls" \
+              --jq '[.[] | select(.merged_at != null and .base.ref == "main")] | if length == 0 then "missing" elif any(.[]; any(.labels[]; .name == "skip-release")) then "true" else "false" end')
+
+            if [[ "$SKIP_RELEASE" == "missing" ]]; then
+              echo "error: main commit $GITHUB_SHA is not associated with a merged pull request" >&2
+              exit 1
+            fi
+          fi
+
           if [[ "$SKIP_RELEASE" == "true" ]]; then
             echo "skip-release label present; release validation is bypassed"
             echo "release=false" >> "$GITHUB_OUTPUT"
@@ -65,7 +87,7 @@ jobs:
           if-no-files-found: error
 
   dry-run:
-    if: github.event_name == 'pull_request' && github.event.action != 'closed' && needs.validate.outputs.release == 'true'
+    if: github.event_name == 'pull_request' && needs.validate.outputs.release == 'true'
     needs:
       - lint
       - validate
@@ -98,11 +120,11 @@ jobs:
   release:
     if: >-
       needs.validate.outputs.release == 'true' &&
-      ((github.event_name == 'pull_request' && github.event.pull_request.merged == true) ||
-      github.event_name == 'workflow_dispatch')
+      (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
     needs:
-      - lint
       - validate
+    permissions:
+      contents: write
     runs-on: macos-15
     timeout-minutes: 45
     env:
@@ -115,7 +137,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: main
+          ref: ${{ github.sha }}
           fetch-depth: 0
           fetch-tags: true
 
@@ -212,7 +234,6 @@ jobs:
         env:
           VERSION: ${{ needs.validate.outputs.version }}
         run: |
-          CHECKSUM=$(swift package compute-checksum "dist/aranet-cli-$VERSION.artifactbundle.zip")
           cat >> release-notes.md <<EOF
 
           ## Installation
@@ -227,14 +248,10 @@ jobs:
 
           ### aranet-cli executable
 
-          The prebuilt executable supports Apple Silicon Macs only. Add the executable artifact bundle as a binary target:
+          The signed and notarized prebuilt executable supports Apple Silicon Macs only:
 
-          \`\`\`swift
-          .binaryTarget(
-              name: "aranet-cli",
-              url: "https://github.com/heikopanjas/aranet-kit/releases/download/v$VERSION/aranet-cli-$VERSION.artifactbundle.zip",
-              checksum: "$CHECKSUM"
-          )
+          \`\`\`bash
+          curl -LO "https://github.com/heikopanjas/aranet-kit/releases/download/v$VERSION/aranet-cli-$VERSION-macos-arm64.tar.gz"
           \`\`\`
           EOF
 
@@ -245,7 +262,6 @@ jobs:
         run: |
           gh release create "v$VERSION" \
             "dist/aranet-cli-$VERSION-macos-arm64.tar.gz" \
-            "dist/aranet-cli-$VERSION.artifactbundle.zip" \
             "dist/SHA256SUMS.txt" \
             --title "v$VERSION" \
             --notes-file release-notes.md \
