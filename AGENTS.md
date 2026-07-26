@@ -776,25 +776,31 @@ scripts/verify-binary-architecture.sh "$(swift build -c release --show-bin-path)
 
 ### Workflow and Version Gate
 
-- Direct pushes to `main` are disabled. `.github/workflows/release.yml` runs for pull
-  requests targeting `main`.
+- Direct pushes to `main` are disabled. `.github/workflows/release.yml` validates pull
+  requests targeting `main` and publishes releases from the resulting push to `main`.
 - Open, synchronized, reopened, labeled, and unlabeled pull requests run strict linting,
   release metadata validation, and an unsigned arm64 packaging dry run.
-- A merged pull request runs the signed and notarized release job from `main` and creates
-  the `v<toolVersion>` tag and GitHub release.
+- The merge commit pushed to `main` runs the signed and notarized release job and creates
+  the `v<toolVersion>` tag and GitHub release. The job checks out the exact pushed SHA so
+  its Actions branch and source provenance both identify `main`.
+- Manual releases are permitted only when `workflow_dispatch` is run from `main`; release
+  content write permission is scoped to the publication job.
+- Production publication runs are serialized and never cancel an in-progress signing or
+  notarization job; updated checks for the same open pull request remain cancellable.
 - `Sources/AranetCli/AranetCli.swift` and the newest released section in `CHANGELOG.md`
   must contain the same semantic version. The release fails if that tag already exists.
 - Apply the `skip-release` label to changes that do not require a version bump. The
-  validation job reports success while packaging and publishing are skipped. The
-  workflow listens for both label addition and removal so required checks are refreshed.
+  validation job reports success while packaging and publishing are skipped. Pull-request
+  checks read the event labels; the subsequent `main` push resolves the merged pull request
+  associated with its commit and honors the same label. A `main` push without an associated
+  merged pull request fails validation rather than publishing.
 - `lint` and `validate` must be required status checks in `main` branch protection.
 
 ### Architecture and Artifacts
 
 - All CI binaries are Apple Silicon `arm64`; every build verifies the Mach-O architecture
   with `scripts/verify-binary-architecture.sh`.
-- Release assets are `aranet-cli-<version>-macos-arm64.tar.gz`,
-  `aranet-cli-<version>.artifactbundle.zip`, and `SHA256SUMS.txt`.
+- Release assets are `aranet-cli-<version>-macos-arm64.tar.gz` and `SHA256SUMS.txt`.
 - The pre-built executable supports Apple Silicon Macs only. Intel users build from source.
 - `AranetKit` is distributed as source through the release tag. Do not publish an
   `.xcframework` or DocC archive unless this decision changes.
@@ -943,7 +949,7 @@ The current version is defined in `Sources/AranetCli/AranetCli.swift` as the `to
 @main
 struct AranetCli: AsyncParsableCommand {
     /// Current tool version, reported by the root-level `--version` flag.
-    static let toolVersion = "3.5.1"  // <-- Update this version
+    static let toolVersion = "3.5.2"  // <-- Update this version
 
     static let configuration = CommandConfiguration(
         commandName: "aranet-cli",
@@ -992,6 +998,29 @@ After making ANY code changes:
 
 ## Recent Updates & Decisions
 
+### 2026-07-26 (Tarball-Only CLI Releases, Version 3.5.2)
+
+- **Patch version bump**: 3.5.1 to 3.5.2
+- **Release assets simplified**: Removed the redundant executable artifact bundle;
+  releases now contain only the signed arm64 CLI tarball and SHA-256 checksum manifest
+- **Clean packaging output**: Packaging removes stale CLI archives, legacy artifact bundles,
+  staging directories, and checksum manifests while preserving unrelated output files
+- **Release trigger split**: Pull requests perform validation and unsigned packaging;
+  the merge commit's push to `main` performs signing, notarization, and publication
+- **Clear provenance**: Production releases check out the exact pushed SHA and appear as
+  `main` push runs instead of closed pull-request runs attributed to the source branch
+- **Least privilege**: Only the publication job receives release content write permission;
+  manual publication is rejected unless dispatched from `main`
+- **Safe concurrency**: Main publication runs are serialized without cancellation, while
+  superseded validation runs for the same pull request are cancelled
+- **Skip-release propagation**: Main-push validation resolves the associated merged pull
+  request and honors its `skip-release` label; unassociated main pushes fail safely
+- **AranetKit unchanged**: The library remains a source package distributed by release tags
+- **Files changed**: `.github/workflows/release.yml`, `scripts/package-release.sh`,
+  `Sources/AranetCli/AranetCli.swift`, `README.md`, `CHANGELOG.md`, `AGENTS.md`
+- **Reasoning**: Consumers install the CLI from the tarball, so publishing a second archive
+  containing the same executable adds maintenance and release clutter without value
+
 ### 2026-07-26 (Signed arm64 Releases, Version 3.5.1)
 
 - **Patch version bump**: 3.5.0 to 3.5.1
@@ -999,8 +1028,8 @@ After making ANY code changes:
   unsigned dry run; merged pull requests create signed and notarized GitHub releases
 - **Apple Silicon artifacts**: Debug, release, pre-release, and final release binaries are
   verified as arm64; Intel users build from source
-- **Distribution**: Releases attach a CLI tarball, executable artifact bundle, and SHA-256
-  checksums; `AranetKit` remains a source package distributed by the release tag
+- **Distribution**: Releases initially attached a CLI tarball, executable artifact bundle,
+  and SHA-256 checksums; the artifact bundle was removed in version 3.5.2
 - **Signing**: Developer ID certificate in an ephemeral keychain with App Store Connect
   API Team Key notarization; bare executable is not stapled because Mach-O cannot hold a ticket
 - **Version gate**: Shared scripts ensure `toolVersion`, CHANGELOG, and release tags agree

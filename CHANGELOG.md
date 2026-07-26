@@ -7,12 +7,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.5.2] - 2026-07-26
+
+### Changed
+
+- Release assets now contain only the signed arm64 CLI tarball and SHA-256 checksums
+- Removed the redundant SwiftPM executable artifact bundle from release packaging
+- Release packaging removes stale tarballs and legacy artifact bundles from previous runs
+- Pull requests now validate and dry-run releases, while the merge commit pushed to
+ `main` triggers signing, notarization, and publishing
+- Release publication checks out the exact pushed `main` commit instead of running from
+ a closed pull-request event associated with its source branch
+
 ## [3.5.1] - 2026-07-26
 
 ### Added
 
 - Signed and notarized arm64 release workflow for pull requests merged into `main`
-- SwiftPM executable artifact bundle, compressed CLI archive, and SHA-256 checksums
+- Compressed CLI archive and SHA-256 checksums
 - Reusable strict Swift source lint workflow
 - `skip-release` pull-request label for changes that do not require a release
 - Shared scripts for version validation, architecture checks, and release packaging
@@ -173,7 +185,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Troubleshooting guide
 - Development setup instructions
 
-[Unreleased]: https://github.com/heikopanjas/aranet-kit/compare/v3.5.1...HEAD
+[Unreleased]: https://github.com/heikopanjas/aranet-kit/compare/v3.5.2...HEAD
+[3.5.2]: https://github.com/heikopanjas/aranet-kit/compare/v3.5.1...v3.5.2
 [3.5.1]: https://github.com/heikopanjas/aranet-kit/compare/v3.5.0...v3.5.1
 [3.5.0]: https://github.com/heikopanjas/aranet-kit/compare/v3.4.0...v3.5.0
 [3.4.0]: https://github.com/heikopanjas/aranet-kit/compare/v3.3.1...v3.4.0
