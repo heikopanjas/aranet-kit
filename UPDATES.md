@@ -4,6 +4,14 @@ This file is the append-only log of project decisions and notable changes, maint
 
 <!-- {changelog} -->
 
+### 2026-10-22 11:05 (v4.0.0, cli over an injectable environment)
+
+- the cli reads its client, output streams, terminal flag, clock, arguments, and interrupts from the task-local clienvironment; commands live in one file each with devicescanner, errorprinter, exitplan, and spinnerticker as helpers (test_plan.md milestone m4)
+- read and monitor accept --timeout, monitor stops cleanly on ctrl+c and keeps the other devices running when one fails, the spinner only animates on a terminal, json encoding failures are reported instead of dropped
+- added aranetclitests for every command path, globaloptions, exitplan, the spinner with a fake ticker, the json writer, and exit tests for the entry point; the gate is raised once ci prints the coverage table
+- rationale: code_review.md c8, c9, c10, k10, and a3; the old cli constructed aranetclient and wrote to stdout directly, which made every command untestable
+- version: stays 4.0.0 (joins the unreleased major)
+
 ### 2026-10-22 10:48 (v4.0.0, main-actor client over a bluetooth seam)
 
 - aranetclient is now a main-actor class driving corebluetooth through the bluetoothcentral protocol; corebluetoothcentral is the only file holding cbperipheral objects and is the single coverage exclusion (test_plan.md milestone m3)

@@ -45,7 +45,10 @@ let package = Package(
         // Unit tests for the CLI presentation layer
         .testTarget(
             name: "AranetCliTests",
-            dependencies: ["AranetCli"]
+            dependencies: [
+                "AranetCli",
+                .product(name: "ArgumentParser", package: "swift-argument-parser")
+            ]
         )
     ]
 )

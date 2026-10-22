@@ -21,12 +21,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Pairing guidance no longer refers to running a command
 - The monitoring loop lives in `ReadingMonitor` with its scheduling in `MonitorSchedule`, both unit tested with fakes
 - Monitoring only requires the initial reading to carry an interval; a missing age falls back to the full interval
+- `aranet-cli` routes everything it touches outside its own logic (client, output, terminal detection, clock, arguments, interrupts) through an injectable environment, and is split into one file per command and helper type
+- `aranet-cli monitor` stops cleanly on Ctrl+C, prints `Monitoring stopped.`, and keeps monitoring the remaining devices when one of them fails
+- The progress spinner only animates when standard output is a terminal; pipes get plain status lines
 
 ### Added
 
 - `SensorClient` protocol, adopted by `AranetClient`, so consumers can inject a fake
 - `AranetError.operationInProgress`, thrown when a device is read while a read of it is still running
 - `AranetError` conforms to `LocalizedError` and `CustomStringConvertible`, so `localizedDescription` carries the message
+- `aranet-cli read` and `aranet-cli monitor` accept `--timeout` for their internal scan, like `scan`
+- `AranetCliTests` cover every command, option, exit path, the spinner, and the JSON writer through the fake environment
 
 ### Fixed
 
@@ -36,6 +41,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - A peripheral without any reading characteristic fails with `readFailed` immediately
 - An encryption error on a reading characteristic counts toward pairing detection
 - A read timeout from an earlier read can no longer fail a later read of the same device
+- A JSON payload that cannot be encoded is reported on standard error and fails the command instead of being dropped silently
+- Readings of several devices are printed in the order the devices were given instead of completion order
 
 ## [3.5.5] - 2026-10-22
 

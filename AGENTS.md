@@ -157,13 +157,21 @@ public class AranetClient {
     func monitor(from device: AranetDevice) -> AsyncStream<Result<AranetReading, Error>>
 }
 
-// CLI: Command handling and presentation
-@main
-struct AranetCLI: AsyncParsableCommand {
-    @Command var read: ReadCommand
-    @Command var scan: ScanCommand
+// CLI: one file per command; every side effect goes through the task-local CliEnvironment
+struct CliEnvironment: Sendable {
+    var makeClient: @MainActor @Sendable () -> any SensorClient
+    var write: @Sendable (String) -> Void          // standard output
+    var writeError: @Sendable (String) -> Void     // standard error
+    var isTerminal: Bool                           // spinner gate
+    var now: @Sendable () -> Date                  // monitor timestamps
+    var arguments: [String]                        // for --json detection before parsing
+    var interrupts: @Sendable () -> AsyncStream<Void>  // Ctrl+C
+
+    @TaskLocal static var current = CliEnvironment.live
 }
 ```
+
+Commands never call `print`, `Date()`, `isatty`, or `AranetClient()` directly; they read `CliEnvironment.current`. Tests install a fake environment with the `.cli()` trait in `Tests/AranetCliTests/CliTestContext.swift`. The `Never`-returning exit paths in `AranetCliMain` are covered by Swift Testing exit tests; the exit decision itself is the pure `ExitPlan`.
 
 ### Public API Surface
 
@@ -545,10 +553,14 @@ swift run aranet-cli scan
 swift run aranet-cli read <device> --verbose
 
 # Format code with the Xcode-bundled swift-format
-xcrun swift-format format --configuration .swift-format --in-place --recursive Sources
+xcrun swift-format format --configuration .swift-format --in-place --recursive Sources Tests
 
 # Lint code; --strict makes findings fail CI
-xcrun swift-format lint --configuration .swift-format --recursive --strict Sources
+xcrun swift-format lint --configuration .swift-format --recursive --strict Sources Tests
+
+# Run the suites and the coverage gate
+swift test
+Scripts/check-coverage.sh
 
 # Verify the arm64 release artifact
 Scripts/verify-binary-architecture.sh "$(swift build -c release --show-bin-path)/aranet-cli"

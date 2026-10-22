@@ -116,7 +116,8 @@ aranet-cli read "B6F33CE5-4712-5841-C308-B4217CDAFD68"
 aranet-cli read 228EB --verbose
 ```
 
-The `read` and `monitor` commands perform an internal 15-second scan before connecting.
+The `read` and `monitor` commands perform an internal scan before connecting; it lasts
+15 seconds by default and `--timeout` changes it, as for `scan`.
 Devices that cannot be matched are reported after the successful readings, and the
 command exits with a failure status if any device errored or was not found.
 
@@ -159,6 +160,9 @@ aranet-cli monitor 228EB 30F9A
 
 # Monitor with verbose output
 aranet-cli monitor 228EB --verbose
+
+# Give slow-advertising devices more time to show up in the initial scan
+aranet-cli monitor 228EB --timeout 30
 ```
 
 The monitor command:
@@ -168,8 +172,9 @@ The monitor command:
 - Schedules readings 3 seconds after each sensor update
 - Adapts automatically when the device interval is changed during a session
 - Posts an `aranetReadingDidUpdate` notification for every reading
-- Continues monitoring until interrupted (Ctrl+C)
-- When monitoring multiple devices, readings interleave as they arrive
+- Continues monitoring until interrupted; Ctrl+C stops it cleanly and prints `Monitoring stopped.`
+- When monitoring multiple devices, readings interleave as they arrive, and a device that fails is reported while the others keep going; the exit status is non-zero if any device failed
+- Shows an animated spinner only when standard output is a terminal, so piped output stays line-oriented
 
 ### Script and agent mode (`--json`)
 
@@ -337,14 +342,27 @@ If scanning finds no devices:
 ```text
 Sources/
 ├── AranetKit/           # Reusable library
-│   ├── AranetClient.swift        # CoreBluetooth client
+│   ├── AranetClient.swift        # Main-actor client over the Bluetooth seam
+│   ├── Bluetooth/                # BluetoothCentral protocol, events, CoreBluetooth adapter
+│   ├── Client/                   # ReadSession state machine, waiters, SensorClient
+│   ├── Monitoring/               # ReadingMonitor loop and MonitorSchedule
+│   ├── Parsing/                  # AranetPayloadParser and ByteReader
+│   ├── Diagnostics/              # Hex dumps and unified-log sink
+│   ├── Types/                    # Data models, one type per file
 │   ├── AranetNotifications.swift # NotificationCenter integration
-│   ├── AranetTypes.swift         # Data models and types
 │   └── Units.swift               # Custom measurement units
 └── AranetCli/           # CLI application
-    ├── AranetCli.swift       # CLI interface
+    ├── AranetCliMain.swift   # Entry point and JSON error reporting
+    ├── AranetCli.swift       # Root command
+    ├── CliEnvironment.swift  # Injectable client, output, clock, interrupts
+    ├── ScanCommand.swift     # scan
+    ├── ReadCommand.swift     # read
+    ├── MonitorCommand.swift  # monitor
     ├── JsonOutput.swift      # Machine-readable output (--json)
     └── ProgressSpinner.swift # Terminal UI utilities
+Tests/
+├── AranetKitTests/      # Library suites over a fake Bluetooth central
+└── AranetCliTests/      # CLI suites over a fake environment
 ```
 
 ### Using AranetKit as a Library
