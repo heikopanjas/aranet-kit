@@ -4,6 +4,14 @@ This file is the append-only log of project decisions and notable changes, maint
 
 <!-- {changelog} -->
 
+### 2026-10-22 10:12 (v3.5.3, test plan for full coverage)
+
+- added test_plan.md: five milestones from test infrastructure to a 100% line coverage gate, with protocol seams for parsing, monitoring, the bluetooth central, and the cli environment so every code path runs under swift testing with fakes
+- the only excluded file is the corebluetooth delegate adapter, because its callbacks take peripheral objects that cannot be created in a test process
+- pointed the testing section in agents.md at the plan
+- rationale: the package has no tests and the code review showed the shapes that block them; tests drive the refactors milestone by milestone instead of landing after them
+- version bump: none (no code change)
+
 ### 2026-10-22 09:57 (v3.5.3, code review fix plan)
 
 - added code_review.md with the findings of a full static review against the swift-coding-conventions, swift-concurrency-pro, and swift-testing-pro skills, plus a six-phase fix plan with milestones and verification commands

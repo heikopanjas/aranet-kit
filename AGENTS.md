@@ -118,7 +118,7 @@ When initializing a session or analyzing the workspace, refer to instruction fil
 
 The package currently has no test target. CI verifies that debug and release builds succeed, that the binary is `arm64` (`Scripts/verify-binary-architecture.sh`), and that sources pass strict swift-format linting. Bluetooth behavior is verified manually against real devices with `swift run aranet-cli <command> --verbose`.
 
-- Unit tests: `Tests/AranetKitTests/` when added, covering byte parsing and unit conversion without Bluetooth hardware (load the `swift-testing-pro` skill)
+- Unit tests: `Tests/AranetKitTests/` and `Tests/AranetCliTests/` when added, covering byte parsing and unit conversion without Bluetooth hardware (load the `swift-testing-pro` skill); `TEST_PLAN.md` is the milestone plan for reaching 100% line coverage with protocol seams and fakes
 - Integration tests: manual runs against real devices; CoreBluetooth is not mocked
 - Test coverage requirements: none yet
 - Testing framework: Swift Testing
