@@ -32,6 +32,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `AranetError` conforms to `LocalizedError` and `CustomStringConvertible`, so `localizedDescription` carries the message
 - `aranet-cli read` and `aranet-cli monitor` accept `--timeout` for their internal scan, like `scan`
 - `AranetCliTests` cover every command, option, exit path, the spinner, and the JSON writer through the fake environment
+- `Scripts/check-coverage.sh` gates at 100% line coverage of `Sources/`, lists uncovered line ranges, and excludes only the CoreBluetooth adapter
 
 ### Fixed
 

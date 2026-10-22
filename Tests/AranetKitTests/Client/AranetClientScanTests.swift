@@ -117,6 +117,26 @@ struct AranetClientScanTests {
         #expect(harness.log.contains("Bluetooth ready timeout") == true)
     }
 
+    @Test("An interrupted ready timeout leaves the waiting caller alone")
+    func interruptedReadyTimeout() async throws -> Void {
+        let harness = ClientHarness(state: .unknown)
+        let task = Task {
+            try await harness.client.scan(timeout: 15)
+        }
+        await settle("ready timeout armed") { harness.gate.waiting == 1 }
+
+        harness.gate.interrupt()
+        await settle("ready timeout gone") { harness.gate.waiting == 0 }
+        #expect(harness.log.contains("Bluetooth ready timeout") == false)
+
+        harness.central.state = .poweredOn
+        harness.central.send(.stateChanged(.poweredOn))
+        await settle("scan sleeping") { harness.gate.waiting == 1 }
+        harness.gate.release()
+
+        #expect(try await task.value == [])
+    }
+
     @Test("Two callers waiting for Bluetooth are both released by one state change")
     func multipleReadyWaiters() async throws -> Void {
         let harness = ClientHarness(state: .unknown)

@@ -65,18 +65,13 @@ public final class AranetClient {
     private var knownPeripherals: [UUID: PeripheralInfo] = [:]
     private var operations: [UUID: ReadOperation] = [:]
 
-    /// Creates a client backed by CoreBluetooth. Constructing it triggers the system Bluetooth permission prompt.
-    public convenience init() {
-        self.init(central: CoreBluetoothCentral())
-    }
-
     init(
         central: any BluetoothCentral,
         log: @escaping AranetLog.Sink = AranetLog.standard,
         readyTimeout: TimeInterval = AranetClient.defaultReadyTimeout,
         pairingCheckDelay: TimeInterval = AranetClient.defaultPairingCheckDelay,
         readTimeout: TimeInterval = AranetClient.defaultReadTimeout,
-        sleep: @escaping Sleep = { try await Task.sleep(for: .seconds($0)) }
+        sleep: @escaping Sleep = AranetClient.systemSleep
     ) {
         self.central = central
         self.logSink = log
@@ -87,6 +82,11 @@ public final class AranetClient {
         self.central.eventHandler = { [weak self] event in
             self?.handle(event)
         }
+    }
+
+    /// The production `sleep`: suspends with `Task.sleep`, throwing `CancellationError` when the task is cancelled.
+    static func systemSleep(_ seconds: TimeInterval) async throws -> Void {
+        try await Task.sleep(for: .seconds(seconds))
     }
 
     // MARK: - Public Methods

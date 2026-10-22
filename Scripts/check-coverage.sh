@@ -10,7 +10,7 @@
 set -euo pipefail
 
 ROOT_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
-THRESHOLD="${COVERAGE_THRESHOLD:-0}"
+THRESHOLD="${COVERAGE_THRESHOLD:-100}"
 
 # CoreBluetoothCentral.swift forwards CBCentralManager and CBPeripheral delegate
 # callbacks into BluetoothEvent values. Its methods take CBPeripheral, CBService,
@@ -44,6 +44,33 @@ with open(codecov_path, encoding="utf-8") as handle:
 
 sources_prefix = root_dir.rstrip("/") + "/Sources/"
 rows = []
+uncovered = {}
+
+
+def uncovered_lines(segments):
+    """Lines inside regions that never executed, from llvm-cov's [line, col, count, hasCount, isRegionEntry, ...] segments."""
+    lines = set()
+    ordered = sorted(segments, key=lambda s: (s[0], s[1]))
+    for index, segment in enumerate(ordered):
+        line, _, count, has_count = segment[0], segment[1], segment[2], segment[3]
+        if not has_count or count > 0:
+            continue
+        end_line = ordered[index + 1][0] if index + 1 < len(ordered) else line
+        lines.update(range(line, max(line, end_line) + 1))
+    return sorted(lines)
+
+
+def ranges(lines):
+    text = []
+    start = previous = None
+    for line in lines + [None]:
+        if start is not None and line == previous + 1:
+            previous = line
+            continue
+        if start is not None:
+            text.append(str(start) if start == previous else f"{start}-{previous}")
+        start = previous = line
+    return ", ".join(text)
 total_lines = 0
 covered_lines = 0
 total_regions = 0
@@ -64,6 +91,8 @@ for data in export.get("data", []):
         region_covered = int(regions.get("covered", 0))
         skipped = relative in excluded
         rows.append((relative, line_count, line_covered, region_count, region_covered, skipped))
+        if not skipped and line_covered < line_count:
+            uncovered[relative] = uncovered_lines(entry.get("segments", []))
         if skipped:
             continue
         total_lines += line_count
@@ -83,6 +112,10 @@ for relative, line_count, line_covered, region_count, region_covered, skipped in
         f"{relative:<{width}}  {line_covered:>4}/{line_count:<4}  {percent(line_covered, line_count):>6.1f}%  "
         f"{region_covered:>4}/{region_count:<4}  {percent(region_covered, region_count):>7.1f}%{note}"
     )
+
+for relative in sorted(uncovered):
+    if uncovered[relative]:
+        print(f"uncovered in {relative}: lines {ranges(uncovered[relative])}")
 
 line_percent = percent(covered_lines, total_lines)
 region_percent = percent(covered_regions, total_regions)

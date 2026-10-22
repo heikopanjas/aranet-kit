@@ -118,8 +118,8 @@ When initializing a session or analyzing the workspace, refer to instruction fil
 
 - Testing framework: Swift Testing, run with `swift test`; load the `swift-testing-pro` skill before writing or reviewing tests
 - Layout: `Tests/AranetKitTests/` and `Tests/AranetCliTests/` mirror `Sources/`, with shared fixtures in `Fixtures/`, test doubles in `Fakes/`, and tags in `Tags.swift`; the CLI suite uses `@testable import AranetCli`
-- Tests first: add or update the test before the production change it covers
-- Coverage: `Scripts/check-coverage.sh` runs the suites with code coverage and fails below `COVERAGE_THRESHOLD` (default set in the script and raised per `TEST_PLAN.md` milestone, ending at 100); region coverage is reported but not gated; the only excluded file is the CoreBluetooth delegate adapter, which needs real peripherals
+- Tests first: add or update the test before the production change it covers; every new line in `Sources/` must be reached by a test or the gate fails
+- Coverage: `Scripts/check-coverage.sh` runs the suites with code coverage and fails below `COVERAGE_THRESHOLD`, which defaults to 100; it prints a per-file table and the uncovered line ranges of any file below 100%; region coverage is reported but not gated; the only excluded file is `CoreBluetoothCentral.swift`, the CoreBluetooth delegate adapter that also hosts `AranetClient.init()`, because both need a real `CBCentralManager`
 - CI: `build.yml` runs the coverage script and a Thread Sanitizer job (`swift test --sanitize=thread`), the `release.yml` dry run runs `swift test`, and `lint.yml` lints `Tests` as well as `Sources`; the CLI exit tests skip themselves under the sanitizer, whose child process produces no output (`ExitTestSupport`)
 - Integration: manual runs against real devices with `swift run aranet-cli <command> --verbose`; CoreBluetooth is not mocked at the framework level, the `BluetoothCentral` seam is faked instead (from milestone M3 of `TEST_PLAN.md`)
 
@@ -187,7 +187,7 @@ public struct AranetDevice: Identifiable, Hashable, Sendable {
 
 ### Main-Actor Isolation and the Bluetooth Seam
 
-`AranetClient` is `@MainActor` and talks to CoreBluetooth only through the internal `BluetoothCentral` protocol. `CoreBluetoothCentral` owns the `CBCentralManager` (delegate queue `.main`), implements the delegate methods as `nonisolated` forwarders that use `MainActor.assumeIsolated`, and emits `BluetoothEvent` values through the client's event handler. No `@unchecked Sendable` is needed on the client; `CBUUID` carries a retroactive unchecked conformance because it is immutable.
+`AranetClient` is `@MainActor` and talks to CoreBluetooth only through the internal `BluetoothCentral` protocol. `CoreBluetoothCentral` owns the `CBCentralManager` (delegate queue `.main`), implements the delegate methods as `nonisolated` forwarders that use `MainActor.assumeIsolated`, and emits `BluetoothEvent` values through the client's event handler. The public `AranetClient.init()` lives in that file as an extension (the one exception to one type per file), so every line that constructs a CoreBluetooth object sits in the single file excluded from the coverage gate. No `@unchecked Sendable` is needed on the client; `CBUUID` carries a retroactive unchecked conformance because it is immutable.
 
 ```swift
 @MainActor

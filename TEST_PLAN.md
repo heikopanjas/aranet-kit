@@ -4,6 +4,26 @@
 **Companion:** `CODE_REVIEW.md` (findings referenced by ID below)
 **Framework:** Swift Testing (Swift 6.2 toolchain), coverage via `swift test --enable-code-coverage` and `llvm-cov`
 
+## Status (2026-10-22)
+
+All milestones are implemented on `feature/code-review`; `Scripts/check-coverage.sh` gates at 100% line coverage of `Sources/` with `CoreBluetoothCentral.swift` as the single exclusion.
+
+| Milestone | Commit | Result |
+| --- | --- | --- |
+| M0 infrastructure | `test: add swift testing targets and coverage gate` | two test targets, coverage script, CI jobs |
+| M1 pure parsing | `refactor(kit): extract bounds checked payload parser` | parser, reader, hex dump suites |
+| M2 monitoring | `refactor(kit)!: stop monitoring when the stream ends` | `ReadingMonitor`, `MonitorSchedule` suites |
+| M3 client over the seam | `refactor(kit)!: isolate the client on the main actor` | session, registry, scan, read, monitor suites over `FakeBluetoothCentral` |
+| M4 CLI | `refactor(cli)!: route commands through an environment`, `test(cli): cover every command path` | every command path, exit tests, spinner, JSON writer |
+| M5 gate | `test: gate line coverage at 100 percent` | 240+ tests, Thread Sanitizer green, gate at 100 |
+
+Lessons recorded while landing the plan:
+
+- Timer tasks the client starts (`Task { try await sleep(...) }`) run after the Bluetooth command that precedes them is recorded, so tests wait for the fake sleeper (`SleepGate.waiting` or `requestedDelays`) before releasing it; `SleepGate` records an issue when a release finds nobody sleeping.
+- Releasing an `AsyncStream` cancels its producer through `onTermination`, so a monitor test keeps its iterator alive until the loop has ended.
+- Exit tests cannot run under Thread Sanitizer (the child process produces no output); `ExitTestSupport` disables them there.
+- The two hardware-only behaviors planned as `withKnownIssue` (Aranet2 pairing detection, `ago > interval`) turned out to be testable through the fakes and are covered without known-issue markers.
+
 ## Context
 
 The package has no test target and CI runs no tests. The code review showed why tests are hard today: payload parsing is a private method on the Bluetooth-bound client, the monitoring loop mixes scheduling with CoreBluetooth reads, and the CLI constructs `AranetClient` and writes to stdout directly.
@@ -20,7 +40,7 @@ Target: 100% line coverage of `Sources/AranetKit` and `Sources/AranetCli`, enfor
 
 - `Scripts/check-coverage.sh` exits non-zero when line coverage of `Sources/**` is below the threshold; the threshold ends at `100`.
 - Region (branch) coverage is reported in the CI log but not gated; it is reviewed at M5 for dead `??` fallbacks and untaken `else` paths.
-- Exactly one file is excluded, by name, with the reason in the script: `Sources/AranetKit/Bluetooth/CoreBluetoothCentral.swift`, the delegate-forwarding adapter whose methods take `CBPeripheral`, `CBService`, and `CBCharacteristic` arguments that cannot be instantiated in a test process, and whose `CBCentralManager` construction would trigger the Bluetooth permission prompt on a CI runner. It stays under 80 lines of pure forwarding and is verified by the manual hardware checklist. Everything else, including every line of `AranetClient`, is covered through the `BluetoothCentral` seam.
+- Exactly one file is excluded, by name, with the reason in the script: `Sources/AranetKit/Bluetooth/CoreBluetoothCentral.swift`, the delegate-forwarding adapter whose methods take `CBPeripheral`, `CBService`, and `CBCharacteristic` arguments that cannot be instantiated in a test process, and whose `CBCentralManager` construction would trigger the Bluetooth permission prompt on a CI runner. It also hosts the public `AranetClient.init()`, the only other line that constructs a CoreBluetooth object. It stays pure forwarding and is verified by the manual hardware checklist. Everything else, including every line of `AranetClient`, is covered through the `BluetoothCentral` seam.
 - Tests pass under Thread Sanitizer (`swift test -Xswiftc -sanitize=thread`) in a separate CI job.
 - `xcrun swift-format lint --strict` covers `Tests` as well as `Sources`.
 

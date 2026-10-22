@@ -51,11 +51,9 @@ enum JsonOutput {
     /// JSON mode keeps every output stream machine-readable, so errors are written
     /// to stdout alongside the data instead of stderr.
     static func emitError(_ message: String, device: String? = nil) -> Void {
-        guard let text = try? Self.text(for: JsonError(error: message, device: device), pretty: false) else {
-            return
+        if let text = try? Self.text(for: JsonError(error: message, device: device), pretty: false) {
+            CliEnvironment.current.printLine(text)
         }
-
-        CliEnvironment.current.printLine(text)
     }
 
     /// Writes a JSON error payload derived from any error.

@@ -23,13 +23,9 @@ enum AranetCliMain {
         await CliEnvironment.$current.withValue(environment) {
             do {
                 var command = try AranetCli.parseAsRoot(arguments)
+                guard var asyncCommand = command as? AsyncParsableCommand else { return try command.run() }
 
-                if var asyncCommand = command as? AsyncParsableCommand {
-                    try await asyncCommand.run()
-                }
-                else {
-                    try command.run()
-                }
+                try await asyncCommand.run()
             }
             catch {
                 Self.exit(withError: error)

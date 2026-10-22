@@ -13,8 +13,9 @@ import Foundation
 /// The production ``BluetoothCentral``: owns the `CBCentralManager` and forwards delegate callbacks as events.
 ///
 /// This file is excluded from the coverage gate (see `Scripts/check-coverage.sh`): its delegate methods take
-/// `CBPeripheral`, `CBService`, and `CBCharacteristic` arguments that cannot be created in a test process.
-/// Keep it to pure forwarding and verify it with the hardware checklist in `TEST_PLAN.md`.
+/// `CBPeripheral`, `CBService`, and `CBCharacteristic` arguments that cannot be created in a test process, and
+/// constructing the manager triggers the Bluetooth permission prompt. It also hosts the public ``AranetClient/init()``
+/// for the same reason. Keep it to pure forwarding and verify it with the hardware checklist in `TEST_PLAN.md`.
 @MainActor
 final class CoreBluetoothCentral: NSObject, BluetoothCentral {
     var eventHandler: (@MainActor (BluetoothEvent) -> Void)?
@@ -167,5 +168,12 @@ extension CoreBluetoothCentral: CBPeripheralDelegate {
         MainActor.assumeIsolated {
             self.emit(.valueUpdated(id, characteristic: characteristicId, value, error))
         }
+    }
+}
+
+extension AranetClient {
+    /// Creates a client backed by CoreBluetooth. Constructing it triggers the system Bluetooth permission prompt.
+    public convenience init() {
+        self.init(central: CoreBluetoothCentral())
     }
 }
