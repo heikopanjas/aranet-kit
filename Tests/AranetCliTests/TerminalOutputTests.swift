@@ -118,6 +118,26 @@ struct TerminalOutputTests {
         #expect(output.contains("Status Display: YELLOW") == true)
     }
 
+    @Test("Measurements a device omits print no line instead of a placeholder")
+    func missingMeasurementsSkipTheirLines() -> Void {
+        let output = AranetReading(deviceType: .aranet4, name: "Aranet4 BARE", battery: 50).formatOutput()
+        let lines = output.components(separatedBy: "\n")
+
+        #expect(lines.contains("Battery:      50 %") == true)
+        #expect(output.contains("CO2:") == false)
+        #expect(output.contains("Temperature:") == false)
+        #expect(output.contains("Humidity:") == false)
+        #expect(output.contains("Pressure:") == false)
+    }
+
+    @Test("A radon reading without a concentration skips the radon line")
+    func missingRadonConcentrationSkipsRadonLine() -> Void {
+        let output = AranetReading(deviceType: .aranetRadon, name: "Aranet Radon BARE", battery: 50).formatOutput()
+
+        #expect(output.contains("Radon Conc.:") == false)
+        #expect(output.contains("Battery:      50 %") == true)
+    }
+
     @Test("Unknown device types are reported as such")
     func unknownDeviceOutput() -> Void {
         let output = AranetReading(name: "Mystery").formatOutput()

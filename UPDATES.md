@@ -4,6 +4,12 @@ This file is the append-only log of project decisions and notable changes, maint
 
 <!-- {changelog} -->
 
+### 2026-10-22 13:20 (v4.0.0, region coverage)
+
+- covered the five formatter branches for measurements a device omits (co2, temperature, humidity, pressure, radon) with two terminal output tests; region coverage rises from 710 to 715 of 716
+- decision: the last region, the synchronous-command fallback in aranetclimain, stays uncovered and is documented in test_plan.md; a force cast, a preconditionfailure, or a test-only subcommand would all be worse than the gap
+- version: stays 4.0.0 (tests and docs only)
+
 ### 2026-10-22 12:00 (v4.0.0, coverage gate at 100 percent)
 
 - raised coverage_threshold in scripts/check-coverage.sh to 100 and made the script list the uncovered line ranges of any file below it (test_plan.md milestone m5)
