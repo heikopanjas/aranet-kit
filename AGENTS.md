@@ -93,7 +93,7 @@ When initializing a session or analyzing the workspace, refer to instruction fil
 1. **Maintain Consistency**: Keep code style consistent across the codebase
 2. **Test First**: Write tests before implementing features when applicable
 3. **Document Changes**: Update documentation when changing functionality
-4. **Code Review**: Before committing, check the change against the Development Guidelines below; it must build without warnings and pass `xcrun swift-format lint --configuration .swift-format --recursive --strict Sources` (the CI `lint` job)
+4. **Code Review**: Before committing, check the change against the Development Guidelines below; it must build without warnings and pass `xcrun swift-format lint --configuration .swift-format --recursive --strict Sources` (the CI `lint` job); findings and the phased fix plan from the 2026-10-22 review live in `CODE_REVIEW.md`
 5. **Date Changes**: Update the "Last updated" timestamp in this file when making changes
 6. **Log Updates**: Add entries to the "Recent Updates & Decisions" log in `UPDATES.md`
 

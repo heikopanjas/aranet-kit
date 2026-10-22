@@ -4,6 +4,13 @@ This file is the append-only log of project decisions and notable changes, maint
 
 <!-- {changelog} -->
 
+### 2026-10-22 09:57 (v3.5.3, code review fix plan)
+
+- added code_review.md with the findings of a full static review against the swift-coding-conventions, swift-concurrency-pro, and swift-testing-pro skills, plus a six-phase fix plan with milestones and verification commands
+- pointed the code review bullet in agents.md at that plan
+- rationale: the review found unchecked main-actor isolation in aranetclient, continuations that concurrent calls can orphan, a monitor stream whose producer outlives its consumer, and no test target; one tracked plan keeps the fixes ordered and ties the breaking ones to a 4.0.0 release
+- version bump: none (no code change)
+
 ### 2026-10-22 11:46 (v3.5.3, aranet4 payload bounds and protocol docs)
 
 - fixed aranet4 parsing: payloads shorter than 9 bytes now throw invalidData instead of crashing on byte 8, and interval and ago are only read from full 13-byte payloads instead of from 11 bytes
