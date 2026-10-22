@@ -5,7 +5,7 @@ import Testing
 @testable import AranetKit
 
 @MainActor
-@Suite(.tags(.bluetooth), .timeLimit(.minutes(1)))
+@Suite(.tags(.bluetooth), .timeLimit(.minutes(1)), .serialized)
 struct AranetClientScanTests {
     private let first = PeripheralInfo(id: UUID(), name: "Aranet4 1A2B3")
     private let second = PeripheralInfo(id: UUID(), name: nil)
@@ -15,7 +15,9 @@ struct AranetClientScanTests {
         let task = Task {
             try await harness.client.scan(timeout: timeout)
         }
-        await settle("scan started") { harness.central.count(of: self.scanCommand) == 1 }
+        await settle("scan started and sleeping") {
+            harness.central.count(of: self.scanCommand) == 1 && harness.gate.requestedDelays.contains(timeout)
+        }
         return task
     }
 
@@ -69,7 +71,7 @@ struct AranetClientScanTests {
         let secondTask = Task {
             try await harness.client.scan(timeout: 15)
         }
-        await settle("second scan started") { harness.central.count(of: self.scanCommand) == 2 }
+        await settle("second scan started and sleeping") { harness.central.count(of: self.scanCommand) == 2 && harness.gate.waiting == 1 }
         harness.central.send(.discovered(self.second, rssi: -60))
         harness.gate.release()
 
@@ -89,7 +91,7 @@ struct AranetClientScanTests {
 
         harness.central.state = .poweredOn
         harness.central.send(.stateChanged(.poweredOn))
-        await settle("scan started") { harness.central.count(of: self.scanCommand) == 1 }
+        await settle("scan started and sleeping") { harness.central.count(of: self.scanCommand) == 1 && harness.gate.waiting == 2 }
         harness.central.send(.discovered(self.first, rssi: -50))
         harness.gate.release()
 
@@ -124,7 +126,9 @@ struct AranetClientScanTests {
         let secondTask = Task {
             try await harness.client.scan(timeout: 15)
         }
-        await settle("both callers waiting") { harness.log.messages.filter { $0 == "Waiting for Bluetooth to power on..." }.count == 2 }
+        await settle("both callers waiting and the ready timeout armed") {
+            harness.log.messages.filter { $0 == "Waiting for Bluetooth to power on..." }.count == 2 && harness.gate.waiting == 1
+        }
         #expect(harness.gate.requestedDelays == [ClientHarness.readyTimeout], "Only one ready timeout is armed")
 
         harness.central.state = .poweredOn

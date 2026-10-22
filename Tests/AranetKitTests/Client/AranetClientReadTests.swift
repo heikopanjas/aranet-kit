@@ -5,7 +5,7 @@ import Testing
 @testable import AranetKit
 
 @MainActor
-@Suite(.tags(.bluetooth), .timeLimit(.minutes(1)))
+@Suite(.tags(.bluetooth), .timeLimit(.minutes(1)), .serialized)
 struct AranetClientReadTests {
     private static let saf = AranetUUID.serviceSAFTehnika
     private static let detailed = AranetUUID.characteristicCurrentReadingsDetailed
@@ -18,10 +18,14 @@ struct AranetClientReadTests {
 
     private func startRead(_ harness: ClientHarness, of device: AranetDevice? = nil) async -> Task<AranetReading, any Error> {
         let target = device ?? self.device
+        let connects = harness.central.count(of: .connect(target.id))
+        let sleepers = harness.gate.requestedDelays.count
         let task = Task {
             try await harness.client.readCurrentReadings(from: target)
         }
-        await settle("connect requested") { harness.central.count(of: .connect(target.id)) == 1 }
+        await settle("connect requested and watchdog armed") {
+            harness.central.count(of: .connect(target.id)) == connects + 1 && harness.gate.requestedDelays.count == sleepers + 1
+        }
         return task
     }
 
@@ -53,7 +57,7 @@ struct AranetClientReadTests {
         let scanTask = Task {
             try await harness.client.scan(timeout: 15)
         }
-        await settle("scan started") { harness.central.count(of: self.scanServices) == 1 }
+        await settle("scan started and sleeping") { harness.central.count(of: self.scanServices) == 1 && harness.gate.waiting == 1 }
         harness.central.send(.discovered(PeripheralInfo(id: self.device.id, name: "Aranet4 1A2B3"), rssi: -50))
         harness.gate.release()
         let devices = try await scanTask.value
@@ -86,10 +90,7 @@ struct AranetClientReadTests {
         _ = try await firstTask.value
 
         harness.central.retrievable = [:]
-        let secondTask = Task {
-            try await harness.client.readCurrentReadings(from: self.device)
-        }
-        await settle("second connect requested") { harness.central.count(of: .connect(self.device.id)) == 2 }
+        let secondTask = await self.startRead(harness)
         harness.completeAranet4Read(of: self.device.id)
         _ = try await secondTask.value
 
@@ -208,11 +209,8 @@ struct AranetClientReadTests {
         _ = try await firstTask.value
         #expect(harness.gate.waiting == 1, "The first watchdog ignores its cancellation and keeps sleeping")
 
-        let secondTask = Task {
-            try await harness.client.readCurrentReadings(from: self.device)
-        }
-        await settle("second connect requested") { harness.central.count(of: .connect(self.device.id)) == 2 }
-        await settle("second watchdog sleeping") { harness.gate.waiting == 2 }
+        let secondTask = await self.startRead(harness)
+        #expect(harness.gate.waiting == 2, "Both watchdogs are sleeping")
         harness.gate.release()
         await settle("second watchdog past pairing check") { harness.gate.requestedDelays.count == 3 }
         harness.completeAranet4Read(of: self.device.id)

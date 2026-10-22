@@ -1,4 +1,5 @@
 import Foundation
+import Testing
 
 /// A fake `sleep` that suspends callers until the test releases them, recording every requested delay.
 ///
@@ -33,17 +34,26 @@ final class SleepGate {
     }
 
     /// Resumes every suspended caller normally.
+    ///
+    /// Records an issue when nobody is sleeping: the caller the test meant to release has not reached its sleep yet,
+    /// and would otherwise sleep forever. Wait for `waiting` or `requestedDelays` before releasing.
     func release() -> Void {
         let waiters = self.waiters.values
+        if waiters.isEmpty == true {
+            Issue.record("release() found no sleeping caller")
+        }
         self.waiters = [:]
         for waiter in waiters {
             waiter.resume()
         }
     }
 
-    /// Resumes every suspended caller by throwing `CancellationError`.
+    /// Resumes every suspended caller by throwing `CancellationError`; like `release()`, nobody sleeping is an issue.
     func interrupt() -> Void {
         let waiters = self.waiters.values
+        if waiters.isEmpty == true {
+            Issue.record("interrupt() found no sleeping caller")
+        }
         self.waiters = [:]
         for waiter in waiters {
             waiter.resume(throwing: CancellationError())

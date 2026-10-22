@@ -5,7 +5,7 @@ import Testing
 @testable import AranetKit
 
 @MainActor
-@Suite(.tags(.monitoring), .timeLimit(.minutes(1)))
+@Suite(.tags(.monitoring), .timeLimit(.minutes(1)), .serialized)
 struct ReadingMonitorTests {
     private let device = AranetDevice(id: UUID(), name: "Aranet4 MONITOR")
     private let gate = SleepGate()

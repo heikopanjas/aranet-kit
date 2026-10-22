@@ -59,7 +59,7 @@ struct PayloadHexDumpTests {
         let totalLine = lines[6]
         let valueColumn = String(totalLine.dropFirst(7).prefix(36))
 
-        #expect(valueColumn == "FF FF FF FF FF FF FF FF = 18446744073")
+        #expect(valueColumn == "FF FF FF FF FF FF FF FF = 1844674407")
         #expect(totalLine.hasSuffix(" Total (UInt64 LE, nSv)") == true)
     }
 

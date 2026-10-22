@@ -39,13 +39,9 @@ enum JsonOutput {
         }
     }
 
-    /// Writes a JSON payload to standard output.
-    ///
-    /// - Parameters:
-    ///   - value: The payload to encode.
-    ///   - pretty: Pass `false` for single-line output, as required by the
-    ///     newline-delimited stream of the `monitor` command.
-    /// - Throws: ``EncodingFailure`` when the payload cannot be encoded.
+    /// Writes a JSON payload to standard output, pretty-printed unless `pretty` is false, which the
+    /// newline-delimited stream of the `monitor` command needs. Throws ``EncodingFailure`` when the
+    /// payload cannot be encoded.
     static func emit<T: Encodable>(_ value: T, pretty: Bool = true) throws -> Void {
         CliEnvironment.current.printLine(try Self.text(for: value, pretty: pretty))
     }

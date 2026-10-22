@@ -4,7 +4,7 @@ import Testing
 @testable import AranetKit
 
 @MainActor
-@Suite(.tags(.bluetooth, .monitoring), .timeLimit(.minutes(1)))
+@Suite(.tags(.bluetooth, .monitoring), .timeLimit(.minutes(1)), .serialized)
 struct AranetClientMonitorTests {
     private let device = AranetDevice(id: UUID(), name: "Aranet4 1A2B3")
 
