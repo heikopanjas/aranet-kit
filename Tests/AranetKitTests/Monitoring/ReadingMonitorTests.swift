@@ -29,12 +29,12 @@ struct ReadingMonitorTests {
         let task = Task {
             await monitor.run(for: self.device, into: continuation)
         }
-        return MonitorRun(task: task, iterator: stream.makeAsyncIterator())
+        return MonitorRun(task: task, stream: stream)
     }
 
     private struct MonitorRun {
         let task: Task<Void, Never>
-        var iterator: AsyncStream<Result<AranetReading, any Error>>.Iterator
+        let stream: AsyncStream<Result<AranetReading, any Error>>
     }
 
     private func reading(from result: Result<AranetReading, any Error>?) throws -> AranetReading {
@@ -45,9 +45,10 @@ struct ReadingMonitorTests {
     func yieldsInitialReadingThenSleeps() async throws -> Void {
         let script = ReadingScript([.success(ReadingFixtures.aranet4(interval: 300, ago: 42))])
         let publish = PublishLog()
-        var run = self.start(script, publish: publish, sleep: self.gate.sleep)
+        let run = self.start(script, publish: publish, sleep: self.gate.sleep)
+        var iterator = run.stream.makeAsyncIterator()
 
-        let first = try self.reading(from: await run.iterator.next())
+        let first = try self.reading(from: await iterator.next())
 
         #expect(first.co2 == 812)
         #expect(script.readCount == 1)
@@ -58,7 +59,7 @@ struct ReadingMonitorTests {
 
         run.task.cancel()
         self.gate.release()
-        #expect(await run.iterator.next() == nil)
+        #expect(await iterator.next() == nil)
         #expect(script.readCount == 1, "No read may happen after cancellation")
     }
 
@@ -70,13 +71,14 @@ struct ReadingMonitorTests {
             .success(ReadingFixtures.aranet4(co2: 700, interval: 120, ago: nil))
         ])
         let publish = PublishLog()
-        var run = self.start(script, publish: publish, sleep: self.gate.sleep)
+        let run = self.start(script, publish: publish, sleep: self.gate.sleep)
+        var iterator = run.stream.makeAsyncIterator()
 
-        let first = try self.reading(from: await run.iterator.next())
+        let first = try self.reading(from: await iterator.next())
         self.gate.release()
-        let second = try self.reading(from: await run.iterator.next())
+        let second = try self.reading(from: await iterator.next())
         self.gate.release()
-        let third = try self.reading(from: await run.iterator.next())
+        let third = try self.reading(from: await iterator.next())
 
         #expect([first.co2, second.co2, third.co2] == [500, 600, 700])
         #expect(publish.readings.map(\.co2) == [500, 600, 700])
@@ -84,21 +86,22 @@ struct ReadingMonitorTests {
 
         run.task.cancel()
         self.gate.release()
-        #expect(await run.iterator.next() == nil)
+        #expect(await iterator.next() == nil)
     }
 
     @Test("A failed initial read finishes the stream with the error")
     func initialReadFailure() async throws -> Void {
         let script = ReadingScript([.failure(AranetError.connectionFailed)])
         let publish = PublishLog()
-        var run = self.start(script, publish: publish, sleep: self.gate.sleep)
+        let run = self.start(script, publish: publish, sleep: self.gate.sleep)
+        var iterator = run.stream.makeAsyncIterator()
 
-        let result = try #require(await run.iterator.next())
+        let result = try #require(await iterator.next())
 
         #expect(throws: AranetError.connectionFailed) {
             try result.get()
         }
-        #expect(await run.iterator.next() == nil)
+        #expect(await iterator.next() == nil)
         #expect(publish.readings.isEmpty == true)
         #expect(self.gate.requestedDelays.isEmpty == true)
     }
@@ -110,16 +113,17 @@ struct ReadingMonitorTests {
             .failure(AranetError.timeout)
         ])
         let publish = PublishLog()
-        var run = self.start(script, publish: publish, sleep: self.gate.sleep)
+        let run = self.start(script, publish: publish, sleep: self.gate.sleep)
+        var iterator = run.stream.makeAsyncIterator()
 
-        _ = try self.reading(from: await run.iterator.next())
+        _ = try self.reading(from: await iterator.next())
         self.gate.release()
-        let result = try #require(await run.iterator.next())
+        let result = try #require(await iterator.next())
 
         #expect(throws: AranetError.timeout) {
             try result.get()
         }
-        #expect(await run.iterator.next() == nil)
+        #expect(await iterator.next() == nil)
         #expect(publish.readings.count == 1)
     }
 
@@ -127,17 +131,18 @@ struct ReadingMonitorTests {
     func missingIntervalFinishesStream() async throws -> Void {
         let script = ReadingScript([.success(ReadingFixtures.aranet4(interval: nil, ago: nil))])
         let publish = PublishLog()
-        var run = self.start(script, publish: publish, sleep: self.gate.sleep)
+        let run = self.start(script, publish: publish, sleep: self.gate.sleep)
+        var iterator = run.stream.makeAsyncIterator()
 
-        let first = try self.reading(from: await run.iterator.next())
-        let result = try #require(await run.iterator.next())
+        let first = try self.reading(from: await iterator.next())
+        let result = try #require(await iterator.next())
 
         #expect(first.interval == nil)
         #expect(publish.readings == [first])
         #expect(throws: AranetError.invalidData) {
             try result.get()
         }
-        #expect(await run.iterator.next() == nil)
+        #expect(await iterator.next() == nil)
         #expect(self.gate.requestedDelays.isEmpty == true)
     }
 
@@ -148,13 +153,14 @@ struct ReadingMonitorTests {
             .success(ReadingFixtures.aranet4(interval: 60, ago: 5))
         ])
         let publish = PublishLog()
-        var run = self.start(script, publish: publish, sleep: self.gate.sleep)
+        let run = self.start(script, publish: publish, sleep: self.gate.sleep)
+        var iterator = run.stream.makeAsyncIterator()
 
-        _ = try self.reading(from: await run.iterator.next())
+        _ = try self.reading(from: await iterator.next())
         run.task.cancel()
         self.gate.interrupt()
 
-        #expect(await run.iterator.next() == nil)
+        #expect(await iterator.next() == nil)
         #expect(script.readCount == 1)
     }
 
@@ -162,11 +168,12 @@ struct ReadingMonitorTests {
     func throwingSleepEndsLoop() async throws -> Void {
         let script = ReadingScript([.success(ReadingFixtures.aranet4(interval: 60, ago: 5))])
         let publish = PublishLog()
-        var run = self.start(script, publish: publish, sleep: { _ in throw AranetError.timeout })
+        let run = self.start(script, publish: publish, sleep: { _ in throw AranetError.timeout })
+        var iterator = run.stream.makeAsyncIterator()
 
-        _ = try self.reading(from: await run.iterator.next())
+        _ = try self.reading(from: await iterator.next())
 
-        #expect(await run.iterator.next() == nil)
+        #expect(await iterator.next() == nil)
         #expect(script.readCount == 1)
     }
 
