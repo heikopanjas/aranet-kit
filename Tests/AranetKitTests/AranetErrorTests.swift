@@ -13,12 +13,20 @@ struct AranetErrorTests {
         .readFailed,
         .invalidData,
         .timeout,
-        .pairingRequired
+        .pairingRequired,
+        .operationInProgress
     ]
 
     @Test("Every error has a description", arguments: AranetErrorTests.allCases)
     func everyErrorHasDescription(error: AranetError) -> Void {
         #expect(error.description.isEmpty == false)
+    }
+
+    @Test("The localized description is the description", arguments: AranetErrorTests.allCases)
+    func localizedDescriptionMatches(error: AranetError) -> Void {
+        #expect(error.errorDescription == error.description)
+        #expect(error.localizedDescription == error.description)
+        #expect((error as any Error).localizedDescription == error.description)
     }
 
     @Test("Descriptions are distinct")
@@ -28,9 +36,12 @@ struct AranetErrorTests {
         #expect(descriptions.count == Self.allCases.count)
     }
 
-    @Test("Pairing guidance mentions the PIN shown on the device")
+    @Test("Pairing guidance mentions the PIN shown on the device without naming a command")
     func pairingGuidanceMentionsPin() -> Void {
-        #expect(AranetError.pairingRequired.description.contains("PIN") == true)
+        let description = AranetError.pairingRequired.description
+
+        #expect(description.contains("PIN") == true)
+        #expect(description.contains("command") == false)
     }
 
     @Test("Unauthorized guidance points at System Settings")

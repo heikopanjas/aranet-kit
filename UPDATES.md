@@ -4,6 +4,14 @@ This file is the append-only log of project decisions and notable changes, maint
 
 <!-- {changelog} -->
 
+### 2026-10-22 10:48 (v4.0.0, main-actor client over a bluetooth seam)
+
+- aranetclient is now a main-actor class driving corebluetooth through the bluetoothcentral protocol; corebluetoothcentral is the only file holding cbperipheral objects and is the single coverage exclusion (test_plan.md milestone m3)
+- the read flow is the pure readsession state machine; waiterregistry replaces single-slot continuations; watchdogs check operation identity; timeouts and the clock are injectable
+- added sensorclient, aranetError.operationinprogress, localizederror conformance, known-peripheral resolution without scanning, and unified-log diagnostics
+- rationale: code_review.md k1, k2, k3, k5, c2, c3, c4, c5, c6, c7, and k8; every line of the client now runs under test through the fake central
+- version: stays 4.0.0 (joins the unreleased major)
+
 ### 2026-10-22 10:32 (v4.0.0, monitoring without bluetooth)
 
 - extracted the monitoring loop into readingmonitor with injected read, sleep, and publish closures, and its arithmetic into monitorschedule with a minimum delay for overdue devices (test_plan.md milestone m2)

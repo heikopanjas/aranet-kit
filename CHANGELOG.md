@@ -12,13 +12,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 
 - **Breaking:** the deployment target is macOS 13.0
-- **Breaking:** ending iteration of the `monitor(from:)` stream, or cancelling the iterating task, now stops the monitoring loop and its Bluetooth activity; previously the loop kept polling the device until the process exited
+- **Breaking:** cancelling the task that iterates the `monitor(from:)` stream now stops the monitoring loop and its Bluetooth activity; previously the loop kept polling the device until the process exited
+- **Breaking:** `AranetClient` is isolated to the main actor and no longer subclasses `NSObject`; callers outside the main actor must `await` it
+- **Breaking:** `AranetUUID` is an enum namespace instead of a struct
+- `AranetClient` drives CoreBluetooth through the internal `BluetoothCentral` seam; the read flow is a pure `ReadSession` state machine, and `WaiterRegistry` keeps every concurrent waiter
+- A read of a device not discovered by this client is resolved through the system's known peripherals, so stored identifiers can be read without scanning
+- Diagnostics go to the unified log (`com.panjas.aranet-kit`, category `client`); `verbose` echoes them to standard output as before
+- Pairing guidance no longer refers to running a command
 - The monitoring loop lives in `ReadingMonitor` with its scheduling in `MonitorSchedule`, both unit tested with fakes
 - Monitoring only requires the initial reading to carry an interval; a missing age falls back to the full interval
+
+### Added
+
+- `SensorClient` protocol, adopted by `AranetClient`, so consumers can inject a fake
+- `AranetError.operationInProgress`, thrown when a device is read while a read of it is still running
+- `AranetError` conforms to `LocalizedError` and `CustomStringConvertible`, so `localizedDescription` carries the message
 
 ### Fixed
 
 - A device reporting an age greater than its interval is re-read after a minimum delay instead of in a tight loop
+- Concurrent scans, concurrent waits for Bluetooth, and reads cancelled by their caller no longer leave continuations suspended forever
+- A disconnect during a read fails it immediately instead of after the 30-second timeout
+- A peripheral without any reading characteristic fails with `readFailed` immediately
+- An encryption error on a reading characteristic counts toward pairing detection
+- A read timeout from an earlier read can no longer fail a later read of the same device
 
 ## [3.5.5] - 2026-10-22
 

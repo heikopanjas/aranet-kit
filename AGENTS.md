@@ -177,20 +177,22 @@ public struct AranetDevice: Identifiable, Hashable, Sendable {
 }
 ```
 
-### Sendable Conformance for CoreBluetooth
+### Main-Actor Isolation and the Bluetooth Seam
 
-CoreBluetooth types are not Sendable. Use `@unchecked Sendable` wrapper pattern:
+`AranetClient` is `@MainActor` and talks to CoreBluetooth only through the internal `BluetoothCentral` protocol. `CoreBluetoothCentral` owns the `CBCentralManager` (delegate queue `.main`), implements the delegate methods as `nonisolated` forwarders that use `MainActor.assumeIsolated`, and emits `BluetoothEvent` values through the client's event handler. No `@unchecked Sendable` is needed on the client; `CBUUID` carries a retroactive unchecked conformance because it is immutable.
 
 ```swift
 @MainActor
-public class AranetClient: NSObject, @unchecked Sendable {
-    // Bluetooth communication on main actor
+public final class AranetClient {
+    init(central: any BluetoothCentral, log:, readyTimeout:, pairingCheckDelay:, readTimeout:, sleep:)
 }
 ```
 
+Readings are posted to `NotificationCenter` from the main actor; consumers may rely on main-thread delivery.
+
 ### Concurrent Read Isolation
 
-Each read operation gets its own `ReadOperation` instance keyed by peripheral UUID in `activeOperations: [UUID: ReadOperation]`. This prevents cross-device state corruption when reading from multiple peripherals simultaneously.
+Each read is a `ReadOperation` holding a pure `ReadSession` state machine, keyed by peripheral UUID in `operations`. `ReadSession.handle(_:)` turns `BluetoothEvent` values into `ReadCommand` values, so the whole read flow is unit tested without hardware. A second read of a device still being read throws `operationInProgress`.
 
 ### Data Models
 
