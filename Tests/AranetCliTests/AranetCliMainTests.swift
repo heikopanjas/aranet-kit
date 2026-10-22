@@ -18,7 +18,7 @@ struct AranetCliMainTests {
 
     /// The child's standard error as a comment, shown when an expectation fails so a crash in the child is diagnosable.
     private static func diagnostics(_ result: ExitTest.Result?) -> Comment {
-        return Comment(rawValue: "stderr: " + Self.diagnostics(result))
+        return Comment(rawValue: "stderr: " + Self.stderr(result))
     }
 
     @Test("--version prints the version and exits successfully")
