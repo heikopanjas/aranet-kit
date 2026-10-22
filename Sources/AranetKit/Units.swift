@@ -73,6 +73,11 @@ public final class UnitRadiationDose: Dimension, @unchecked Sendable {
         super.init(symbol: symbol, converter: converter)
     }
 
+    /// Subclasses that override `init(coder:)` must restate secure coding support, or archiving fails.
+    public override class var supportsSecureCoding: Bool {
+        return true
+    }
+
     /// Required initializer for NSSecureCoding conformance.
     public required init?(coder: NSCoder) {
         super.init(coder: coder)
@@ -125,6 +130,11 @@ public final class UnitRadioactivity: Dimension, @unchecked Sendable {
     ///   - converter: The unit converter for this unit
     public override init(symbol: String, converter: UnitConverter) {
         super.init(symbol: symbol, converter: converter)
+    }
+
+    /// Subclasses that override `init(coder:)` must restate secure coding support, or archiving fails.
+    public override class var supportsSecureCoding: Bool {
+        return true
     }
 
     /// Required initializer for NSSecureCoding conformance.

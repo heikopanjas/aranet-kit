@@ -15,6 +15,7 @@ jobs:
 
   build:
     runs-on: macos-15
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
 
@@ -25,16 +26,32 @@ jobs:
       - name: Build
         run: |
           swift build
-          scripts/verify-binary-architecture.sh "$(swift build --show-bin-path)/aranet-cli"
+          Scripts/verify-binary-architecture.sh "$(swift build --show-bin-path)/aranet-cli"
+
+      - name: Test with coverage
+        run: Scripts/check-coverage.sh
 
       - name: Build Release
         run: |
           swift build -c release
-          scripts/verify-binary-architecture.sh "$(swift build -c release --show-bin-path)/aranet-cli"
+          Scripts/verify-binary-architecture.sh "$(swift build -c release --show-bin-path)/aranet-cli"
+
+  thread-sanitizer:
+    runs-on: macos-15
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: swift-actions/setup-swift@v2
+        with:
+          swift-version: "6.2"
+
+      - name: Test under Thread Sanitizer
+        run: swift test --sanitize=thread
 
   pre-release:
     if: github.ref == 'refs/heads/develop' && github.event_name == 'push'
-    needs: [build, lint]
+    needs: [build, lint, thread-sanitizer]
     runs-on: macos-15
     permissions:
       contents: write
@@ -51,14 +68,14 @@ jobs:
       - name: Prepare Binary
         run: |
           BINARY="$(swift build -c release --show-bin-path)/aranet-cli"
-          scripts/verify-binary-architecture.sh "$BINARY"
+          Scripts/verify-binary-architecture.sh "$BINARY"
           cp "$BINARY" aranet-cli
           chmod +x aranet-cli
 
       - name: Extract Version
         id: version
         run: |
-          VERSION=$(scripts/extract-version.sh)
+          VERSION=$(Scripts/extract-version.sh)
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
 
       - name: Generate Tag and Name

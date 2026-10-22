@@ -7,7 +7,7 @@
   "tabWidth": 4,
   "maximumBlankLines": 1,
   "spacesBeforeEndOfLineComments": 2,
-   "respectsExistingLineBreaks": true,
+  "respectsExistingLineBreaks": true,
   "lineBreakBeforeControlFlowKeywords": true,
   "lineBreakBeforeEachArgument": false,
   "lineBreakBeforeEachGenericRequirement": false,
@@ -66,6 +66,6 @@
     "UseSynthesizedInitializer": true,
     "UseTripleSlashForDocumentationComments": true,
     "UseWhereClausesInForLoops": true,
-      "ValidateDocumentationComments": true
+    "ValidateDocumentationComments": true
   }
 }
