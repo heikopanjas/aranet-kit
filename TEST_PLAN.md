@@ -23,6 +23,7 @@ Lessons recorded while landing the plan:
 - Releasing an `AsyncStream` cancels its producer through `onTermination`, so a monitor test keeps its iterator alive until the loop has ended.
 - Exit tests cannot run under Thread Sanitizer (the child process produces no output); `ExitTestSupport` disables them there.
 - The two hardware-only behaviors planned as `withKnownIssue` (Aranet2 pairing detection, `ago > interval`) turned out to be testable through the fakes and are covered without known-issue markers.
+- Region coverage stands at 715 of 716. The one open region is the synchronous-command fallback in `AranetCliMain.run(arguments:)`: `parseAsRoot` returns a type-erased `ParsableCommand`, every command of the tool is asynchronous, and the alternatives (a force cast, a `preconditionFailure`, a test-only synchronous subcommand) are worse than the gap. It stays reported, not gated.
 
 ## Context
 
