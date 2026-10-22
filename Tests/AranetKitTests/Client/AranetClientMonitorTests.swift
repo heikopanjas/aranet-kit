@@ -15,7 +15,7 @@ struct AranetClientMonitorTests {
         var iterator = harness.client.monitor(from: self.device).makeAsyncIterator()
         await settle("connect requested") { harness.central.count(of: .connect(self.device.id)) == 1 }
 
-        let first = await confirmation("reading published") { published in
+        await confirmation("reading published") { published in
             let token = NotificationCenter.default.addObserver(forName: .aranetReadingDidUpdate, object: nil, queue: nil) { notification in
                 guard let posted = notification.userInfo?[AranetNotificationKey.device] as? AranetDevice,
                     posted.id == self.device.id
@@ -25,13 +25,12 @@ struct AranetClientMonitorTests {
             defer { NotificationCenter.default.removeObserver(token) }
 
             harness.completeAranet4Read(of: self.device.id)
-            return await iterator.next()
+            await settle("monitor sleeping until the next update") { harness.gate.requestedDelays.contains(261) }
         }
 
-        let reading = try #require(first).get()
+        let reading = try #require(await iterator.next()).get()
         #expect(reading.co2 == 812)
         #expect(harness.log.contains("Reading sensor data...") == true)
-        #expect(harness.gate.requestedDelays.contains(261) == true, "The next read is scheduled from the device interval and age")
 
         harness.gate.interrupt()
 
