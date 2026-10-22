@@ -11,7 +11,7 @@ import Foundation
 
 /// The operations consumers use to talk to Aranet sensors, so they can substitute a fake for ``AranetClient``.
 @MainActor
-public protocol SensorClient: AnyObject {
+public protocol SensorClient: AnyObject, Sendable {
     /// Echoes diagnostics to standard output when true.
     var verbose: Bool { get set }
 

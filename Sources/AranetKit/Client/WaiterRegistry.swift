@@ -11,7 +11,7 @@
 ///
 /// Replaces single-slot continuation properties, which a second concurrent caller would overwrite
 /// and leave the first caller suspended forever.
-struct WaiterRegistry<Value> {
+struct WaiterRegistry<Value: Sendable> {
     private var continuations: [CheckedContinuation<Value, any Error>] = []
 
     var count: Int {

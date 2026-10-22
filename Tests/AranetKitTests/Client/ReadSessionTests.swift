@@ -145,19 +145,18 @@ struct ReadSessionTests {
         #expect(session.pendingReads.contains(Self.detailed) == true)
     }
 
-    @Test(
-        "Reading characteristics are chosen by priority",
-        arguments: zip(
-            [[AranetUUID.characteristicCurrentReadingsAR2Detailed, AranetUUID.characteristicCurrentReadingsAR2],
-             [AranetUUID.characteristicCurrentReadings, AranetUUID.characteristicCurrentReadingsAR2],
-             [AranetUUID.characteristicCurrentReadings]],
-            [
-                AranetUUID.characteristicCurrentReadingsAR2Detailed,
-                AranetUUID.characteristicCurrentReadingsAR2,
-                AranetUUID.characteristicCurrentReadings
-            ]
-        )
-    )
+    private static let priorityCases: [[CBUUID]] = [
+        [AranetUUID.characteristicCurrentReadingsAR2Detailed, AranetUUID.characteristicCurrentReadingsAR2],
+        [AranetUUID.characteristicCurrentReadings, AranetUUID.characteristicCurrentReadingsAR2],
+        [AranetUUID.characteristicCurrentReadings]
+    ]
+    private static let priorityExpectations: [CBUUID] = [
+        AranetUUID.characteristicCurrentReadingsAR2Detailed,
+        AranetUUID.characteristicCurrentReadingsAR2,
+        AranetUUID.characteristicCurrentReadings
+    ]
+
+    @Test("Reading characteristics are chosen by priority", arguments: zip(ReadSessionTests.priorityCases, ReadSessionTests.priorityExpectations))
     func readingCharacteristicPriority(available: [CBUUID], expected: CBUUID) -> Void {
         var session = self.session()
         let commands = self.discovered(&session, readingCharacteristics: available)
