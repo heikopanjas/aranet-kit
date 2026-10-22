@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [4.0.0] - 2026-10-22
+
+### Changed
+
+- **Breaking:** the deployment target is macOS 13.0
+- **Breaking:** ending iteration of the `monitor(from:)` stream, or cancelling the iterating task, now stops the monitoring loop and its Bluetooth activity; previously the loop kept polling the device until the process exited
+- The monitoring loop lives in `ReadingMonitor` with its scheduling in `MonitorSchedule`, both unit tested with fakes
+- Monitoring only requires the initial reading to carry an interval; a missing age falls back to the full interval
+
+### Fixed
+
+- A device reporting an age greater than its interval is re-read after a minimum delay instead of in a tight loop
+
 ## [3.5.5] - 2026-10-22
 
 ### Added

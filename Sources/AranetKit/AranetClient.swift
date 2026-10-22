@@ -396,134 +396,38 @@ public class AranetClient: NSObject, @unchecked Sendable {
     /// Monitors an Aranet device with periodic automatic updates.
     ///
     /// Performs an initial reading to determine the device's measurement interval,
-    /// then schedules subsequent readings 3 seconds after each expected sensor update.
+    /// then schedules subsequent readings shortly after each expected sensor update.
     /// Multiple devices can be monitored concurrently.
+    ///
+    /// The stream finishes after the first failed read. Ending iteration, or cancelling the
+    /// task that iterates, stops the monitoring loop and its Bluetooth activity.
     ///
     /// - Parameter device: The ``AranetDevice`` to monitor, obtained from ``scan(timeout:)``.
     /// - Returns: An async stream of sensor readings.
     @MainActor
     public func monitor(from device: AranetDevice) -> AsyncStream<Result<AranetReading, Error>> {
-        return AsyncStream { continuation in
-            Task { @MainActor [weak self] in
-                guard let self = self else {
-                    continuation.finish()
-                    return
-                }
-
-                do {
-                    if self.verbose == true {
-                        print("[DEBUG] Performing initial reading for monitoring setup...")
-                    }
-
-                    let initialReading = try await self.readCurrentReadings(from: device)
-                    continuation.yield(.success(initialReading))
-                    AranetNotifications.postReadingDidUpdate(device: device, reading: initialReading)
-
-                    guard let interval = initialReading.interval, let ago = initialReading.ago else {
-                        continuation.yield(.failure(AranetError.invalidData))
-                        continuation.finish()
-                        return
-                    }
-
-                    let timeUntilNextUpdate = Int(interval) - Int(ago)
-                    let firstReadDelay = timeUntilNextUpdate + 3
-
-                    if self.verbose == true {
-                        print("[DEBUG] Device interval: \(interval)s, ago: \(ago)s")
-                        print("[DEBUG] Time until next sensor update: \(timeUntilNextUpdate)s")
-                        print("[DEBUG] First reading in \(firstReadDelay) seconds...")
-                    }
-
-                    await self.monitoringLoop(
-                        from: device,
-                        interval: TimeInterval(interval),
-                        initialDelay: TimeInterval(firstReadDelay),
-                        continuation: continuation
-                    )
-                }
-                catch {
-                    if self.verbose == true {
-                        print("[DEBUG] Initial monitoring read failed: \(error)")
-                    }
-                    continuation.yield(.failure(error))
-                    continuation.finish()
-                }
-            }
-        }
-    }
-
-    @MainActor
-    private func monitoringLoop(
-        from device: AranetDevice,
-        interval: TimeInterval,
-        initialDelay: TimeInterval,
-        continuation: AsyncStream<Result<AranetReading, Error>>.Continuation
-    ) async {
-        var currentDelay = initialDelay
-        var currentInterval = interval
-
-        while Task.isCancelled == false {
-            await wait(for: currentDelay)
-
-            if Task.isCancelled == true {
-                continuation.finish()
-                return
-            }
-
-            do {
+        let (stream, continuation) = AsyncStream.makeStream(of: Result<AranetReading, Error>.self)
+        let monitor = ReadingMonitor(
+            read: { device in
                 if self.verbose == true {
                     print("[DEBUG] Reading sensor data...")
                 }
-
-                let reading = try await self.readCurrentReadings(from: device)
-                continuation.yield(.success(reading))
+                return try await self.readCurrentReadings(from: device)
+            },
+            sleep: { delay in
+                try await Task.sleep(for: .seconds(delay))
+            },
+            publish: { device, reading in
                 AranetNotifications.postReadingDidUpdate(device: device, reading: reading)
-
-                if let newInterval = reading.interval {
-                    if currentInterval != TimeInterval(newInterval) && self.verbose == true {
-                        print("[DEBUG] Device interval changed: \(Int(currentInterval))s -> \(newInterval)s")
-                    }
-                    currentInterval = TimeInterval(newInterval)
-                }
-
-                if let ago = reading.ago {
-                    let timeUntilNextUpdate = currentInterval - TimeInterval(ago)
-                    currentDelay = timeUntilNextUpdate + 3.0
-
-                    if self.verbose == true {
-                        print("[DEBUG] Sensor age: \(ago)s, next update in \(Int(timeUntilNextUpdate))s")
-                        print("[DEBUG] Next reading in \(Int(currentDelay)) seconds...")
-                    }
-                }
-                else {
-                    currentDelay = currentInterval + 3.0
-                    if self.verbose == true {
-                        print("[DEBUG] Age not available, using current interval + 3s")
-                    }
-                }
             }
-            catch {
-                if self.verbose == true {
-                    print("[DEBUG] Monitoring read error: \(error)")
-                }
-                continuation.yield(.failure(error))
-                continuation.finish()
-                return
-            }
+        )
+        let task = Task {
+            await monitor.run(for: device, into: continuation)
         }
-
-        continuation.finish()
-    }
-
-    @MainActor
-    private func wait(for delay: TimeInterval) async {
-        await withCheckedContinuation { (timerContinuation: CheckedContinuation<Void, Never>) in
-            let timer = Timer(timeInterval: delay, repeats: false) { timer in
-                timer.invalidate()
-                timerContinuation.resume()
-            }
-            RunLoop.main.add(timer, forMode: .common)
+        continuation.onTermination = { _ in
+            task.cancel()
         }
+        return stream
     }
 
     private func disconnect(_ peripheral: CBPeripheral) {

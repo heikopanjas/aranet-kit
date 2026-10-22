@@ -6,7 +6,7 @@ import PackageDescription
 let package = Package(
     name: "AranetCli",
     platforms: [
-        .macOS(.v12)
+        .macOS(.v13)
     ],
     products: [
         // Library product for AranetKit

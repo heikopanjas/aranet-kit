@@ -28,7 +28,7 @@ Key features:
 
 ## Technology Stack
 
-- **Language:** Swift 6.2+ (swift-tools-version 6.2), macOS 12+
+- **Language:** Swift 6.2+ (swift-tools-version 6.2), macOS 13+
 - **Framework:** Swift Argument Parser (CLI), CoreBluetooth (Bluetooth LE), Foundation Units
 - **Version Control:** Git (`develop` for development, `main` for releases)
 - **Package Manager:** Swift Package Manager (SPM)

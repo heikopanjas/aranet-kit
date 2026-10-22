@@ -4,6 +4,14 @@ This file is the append-only log of project decisions and notable changes, maint
 
 <!-- {changelog} -->
 
+### 2026-10-22 10:32 (v4.0.0, monitoring without bluetooth)
+
+- extracted the monitoring loop into readingmonitor with injected read, sleep, and publish closures, and its arithmetic into monitorschedule with a minimum delay for overdue devices (test_plan.md milestone m2)
+- monitor(from:) now builds its stream with makestream and cancels the producer task on termination, so consumers that stop iterating stop the bluetooth polling
+- raised the platform floor to macos 13 for task.sleep(for:) and the clock apis (code_review.md d4)
+- rationale: the loop mixed scheduling with corebluetooth reads and its producer outlived its consumer; with fakes every path including cancellation is tested
+- version bump: 3.5.5 to 4.0.0 (MAJOR - platform floor and monitor termination semantics change for consumers)
+
 ### 2026-10-22 10:28 (v3.5.5, pure payload parser)
 
 - extracted payload parsing into aranetpayloadparser with a bounds-checked bytereader and a wiredevicetype enum for the on-wire type byte; the client only calls the parser (test_plan.md milestone m1)

@@ -20,7 +20,7 @@ A Swift command-line tool and library for interacting with Aranet Bluetooth sens
 
 ## Requirements
 
-- macOS 12.0 or later
+- macOS 13.0 or later
 - Xcode Command Line Tools or Xcode 14+
 - Swift 6.2+
 - Bluetooth enabled
