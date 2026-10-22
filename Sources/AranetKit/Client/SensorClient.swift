@@ -21,6 +21,6 @@ public protocol SensorClient: AnyObject, Sendable {
     /// Reads the current measurements from one device.
     func readCurrentReadings(from device: AranetDevice) async throws -> AranetReading
 
-    /// Monitors one device; the stream finishes on the first failed read, and cancelling the iterating task stops the loop.
+    /// Monitors one device; the stream finishes on the first failed read, and ending the iteration stops the loop.
     func monitor(from device: AranetDevice) -> AsyncStream<Result<AranetReading, any Error>>
 }

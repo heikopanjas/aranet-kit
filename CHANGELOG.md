@@ -12,7 +12,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 
 - **Breaking:** the deployment target is macOS 13.0
-- **Breaking:** cancelling the task that iterates the `monitor(from:)` stream now stops the monitoring loop and its Bluetooth activity; previously the loop kept polling the device until the process exited
+- **Breaking:** ending the iteration of the `monitor(from:)` stream, by cancelling the consuming task or releasing the stream, now stops the monitoring loop and its Bluetooth activity; previously the loop kept polling the device until the process exited
 - **Breaking:** `AranetClient` is isolated to the main actor and no longer subclasses `NSObject`; callers outside the main actor must `await` it
 - **Breaking:** `AranetUUID` is an enum namespace instead of a struct
 - `AranetClient` drives CoreBluetooth through the internal `BluetoothCentral` seam; the read flow is a pure `ReadSession` state machine, and `WaiterRegistry` keeps every concurrent waiter

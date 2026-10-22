@@ -12,6 +12,8 @@ struct AranetClientMonitorTests {
     func monitoringReadsAndPublishes() async throws -> Void {
         let harness = ClientHarness()
         harness.register(self.device)
+        var iterator = harness.client.monitor(from: self.device).makeAsyncIterator()
+        await settle("connect requested") { harness.central.count(of: .connect(self.device.id)) == 1 }
 
         let first = await confirmation("reading published") { published in
             let token = NotificationCenter.default.addObserver(forName: .aranetReadingDidUpdate, object: nil, queue: nil) { notification in
@@ -22,22 +24,18 @@ struct AranetClientMonitorTests {
             }
             defer { NotificationCenter.default.removeObserver(token) }
 
-            let consumer = Task { () -> Result<AranetReading, any Error>? in
-                var iterator = harness.client.monitor(from: self.device).makeAsyncIterator()
-                return await iterator.next()
-            }
-            await settle("connect requested") { harness.central.count(of: .connect(self.device.id)) == 1 }
             harness.completeAranet4Read(of: self.device.id)
-            return await consumer.value
+            return await iterator.next()
         }
 
         let reading = try #require(first).get()
         #expect(reading.co2 == 812)
         #expect(harness.log.contains("Reading sensor data...") == true)
+        #expect(harness.gate.requestedDelays.contains(261) == true, "The next read is scheduled from the device interval and age")
 
-        await settle("monitor sleeping until the next update") { harness.gate.requestedDelays.contains(261) }
         harness.gate.interrupt()
-        await settle("monitor loop stopped") { harness.gate.waiting == 0 }
+
+        #expect(await iterator.next() == nil, "An interrupted sleep ends the stream")
         #expect(harness.central.count(of: .connect(self.device.id)) == 1, "No read happens once the sleep is interrupted")
     }
 

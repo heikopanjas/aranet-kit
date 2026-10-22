@@ -177,8 +177,8 @@ public final class AranetClient {
     /// then schedules subsequent readings shortly after each expected sensor update.
     /// Multiple devices can be monitored concurrently.
     ///
-    /// The stream finishes after the first failed read. Cancelling the task that iterates the
-    /// stream stops the monitoring loop and its Bluetooth activity.
+    /// The stream finishes after the first failed read. Ending the iteration, by cancelling the consuming task or by
+    /// releasing the stream, stops the monitoring loop and its Bluetooth activity.
     ///
     /// - Parameter device: The ``AranetDevice`` to monitor.
     /// - Returns: An async stream of sensor readings.
