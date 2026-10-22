@@ -1,0 +1,680 @@
+.claude/skills/swift-testing-pro/references/new-features.md:
+  original_sha: 988df5cb556893c789f9aecdc4c8773fdbbda787ab1dad766bf1182a7b9a4819
+  template_version: 5
+  installed_date: 2026-10-22T09:12:19.355349+00:00
+  lang:
+  - swift
+  agent: []
+  ref_count: 1
+  category: skill
+.claude/skills/swift-testing-pro/agents/openai.yaml:
+  original_sha: f7a35b0befd4eb136cf87047543379a63efebb4f0f7eb4490489325d09383c4f
+  template_version: 5
+  installed_date: 2026-10-22T09:12:19.356006+00:00
+  lang:
+  - swift
+  agent: []
+  ref_count: 1
+  category: skill
+.agents/skills/swift-testing-pro/assets/swift-testing-pro-icon.png:
+  original_sha: 13cbe2849191cc3fda400fc065d5fe6afa5b78f09e347d783bfa2b6d852a2b66
+  template_version: 5
+  installed_date: 2026-10-22T09:12:19.354826+00:00
+  lang:
+  - swift
+  agent: []
+  ref_count: 1
+  category: skill
+.claude/skills/swift-concurrency-pro/references/testing.md:
+  original_sha: 4a1fc1aefb572bbdbd75a502a74df795af7e2212eec6836a4f353f9b725abffc
+  template_version: 5
+  installed_date: 2026-10-22T09:12:19.351124+00:00
+  lang:
+  - swift
+  agent: []
+  ref_count: 1
+  category: skill
+.agents/skills/swift-testing-pro/references/writing-better-tests.md:
+  original_sha: 25da3455f6cec4f10d3dff0bf3e8e1372568c75691916541b4d517f451cb8bf1
+  template_version: 5
+  installed_date: 2026-10-22T09:12:19.353703+00:00
+  lang:
+  - swift
+  agent: []
+  ref_count: 1
+  category: skill
+.agents/skills/swift-testing-pro/skills/swift-testing-pro/SKILL.md:
+  original_sha: 36e6c3d59bbec2f8b4ce95644df8519f2c66dcbff55138964be4ad9d60c07781
+  template_version: 5
+  installed_date: 2026-10-22T09:12:19.354639+00:00
+  lang:
+  - swift
+  agent: []
+  ref_count: 1
+  category: skill
+.claude/skills/swift-testing-pro/references/async-tests.md:
+  original_sha: bc6e0eabd10377b5796e9e554a4965a78b7d1aaba8f11021c2a63b6e8a9e669a
+  template_version: 5
+  installed_date: 2026-10-22T09:12:19.355212+00:00
+  lang:
+  - swift
+  agent: []
+  ref_count: 1
+  category: skill
+.agents/skills/swift-testing-pro/references/new-features.md:
+  original_sha: 988df5cb556893c789f9aecdc4c8773fdbbda787ab1dad766bf1182a7b9a4819
+  template_version: 5
+  installed_date: 2026-10-22T09:12:19.353432+00:00
+  lang:
+  - swift
+  agent: []
+  ref_count: 1
+  category: skill
+.agents/skills/swift-concurrency-pro/references/async-streams.md:
+  original_sha: 589ba0dad544b28b158702e239fe6a4077b6d1484c83b8fd51290192bf1ffc9a
+  template_version: 5
+  installed_date: 2026-10-22T09:12:19.348129+00:00
+  lang:
+  - swift
+  agent: []
+  ref_count: 1
+  category: skill
+.claude/skills/swift-testing-pro/assets/swift-testing-pro-icon.png:
+  original_sha: 13cbe2849191cc3fda400fc065d5fe6afa5b78f09e347d783bfa2b6d852a2b66
+  template_version: 5
+  installed_date: 2026-10-22T09:12:19.356801+00:00
+  lang:
+  - swift
+  agent: []
+  ref_count: 1
+  category: skill
+.agents/skills/swift-concurrency-pro/skills/swift-concurrency-pro/SKILL.md:
+  original_sha: 809362b3e932b3bbf9b3f2f79953bae617573e3e24ea135576bbc1b020d89ce0
+  template_version: 5
+  installed_date: 2026-10-22T09:12:19.350038+00:00
+  lang:
+  - swift
+  agent: []
+  ref_count: 1
+  category: skill
+.agents/skills/swift-coding-conventions/SKILL.md:
+  original_sha: 738471cb53200d3033f15fac96666da391e28d1405154662307716836b6b881c
+  template_version: 5
+  installed_date: 2026-10-22T09:12:19.346901+00:00
+  lang:
+  - swift
+  agent: []
+  ref_count: 1
+  category: skill
+.claude/skills/swift-concurrency-pro/references/cancellation.md:
+  original_sha: c83b4134b44ea5a0ee06e785bd0cb85616234469833f9677297b6fcddea1e1fa
+  template_version: 5
+  installed_date: 2026-10-22T09:12:19.351769+00:00
+  lang:
+  - swift
+  agent: []
+  ref_count: 1
+  category: skill
+.claude/skills/swift-concurrency-pro/.claude-plugin/plugin.json:
+  original_sha: 2f3669516dfa9bcdb47b49abdcc1f9ba2d90fbdab576cefadb288439c707a56b
+  template_version: 5
+  installed_date: 2026-10-22T09:12:19.352376+00:00
+  lang:
+  - swift
+  agent: []
+  ref_count: 1
+  category: skill
+.agents/skills/swift-concurrency-pro/references/hotspots.md:
+  original_sha: 199a9fa4beea4a550b3f63e07cddd441d72fd41d1e17e6f3255071a661ce1e6d
+  template_version: 5
+  installed_date: 2026-10-22T09:12:19.347838+00:00
+  lang:
+  - swift
+  agent: []
+  ref_count: 1
+  category: skill
+.agents/skills/swift-testing-pro/SKILL.md:
+  original_sha: ad4f1bff44b5b7fce20b282481e651876efce024d13b16cb969bc433036ac059
+  template_version: 5
+  installed_date: 2026-10-22T09:12:19.354388+00:00
+  lang:
+  - swift
+  agent: []
+  ref_count: 1
+  category: skill
+.claude/skills/swift-testing-pro/skills/swift-testing-pro/SKILL.md:
+  original_sha: 36e6c3d59bbec2f8b4ce95644df8519f2c66dcbff55138964be4ad9d60c07781
+  template_version: 5
+  installed_date: 2026-10-22T09:12:19.356611+00:00
+  lang:
+  - swift
+  agent: []
+  ref_count: 1
+  category: skill
+.agents/skills/git-workflow/SKILL.md:
+  original_sha: e77221a6957de986cdd456c69f80d4009ac8bf5e118a3e926c47260746ae92be
+  template_version: 5
+  installed_date: 2026-10-22T09:12:19.357170+00:00
+  lang:
+  - swift
+  agent:
+  - claude
+  ref_count: 2
+  category: skill
+.claude/skills/swift-testing-pro/references/core-rules.md:
+  original_sha: 2271efdca6c2b7b3365501172147884b6e786bcee7bef680fb4f4718929d6180
+  template_version: 5
+  installed_date: 2026-10-22T09:12:19.355792+00:00
+  lang:
+  - swift
+  agent: []
+  ref_count: 1
+  category: skill
+.claude/skills/swift-concurrency-pro/SKILL.md:
+  original_sha: 95d3098b038a38f163259cb7404070f786fed846a5e8b864e6b34fa7600247f9
+  template_version: 5
+  installed_date: 2026-10-22T09:12:19.352506+00:00
+  lang:
+  - swift
+  agent: []
+  ref_count: 1
+  category: skill
+.agents/skills/swift-concurrency-pro/references/cancellation.md:
+  original_sha: c83b4134b44ea5a0ee06e785bd0cb85616234469833f9677297b6fcddea1e1fa
+  template_version: 5
+  installed_date: 2026-10-22T09:12:19.348962+00:00
+  lang:
+  - swift
+  agent: []
+  ref_count: 1
+  category: skill
+.claude/skills/recent-updates/SKILL.md:
+  original_sha: 27fbb14192738a4e76042bf7322b4b529f4996354fa427700624deccd3ef6dc9
+  template_version: 5
+  installed_date: 2026-10-22T09:12:19.358190+00:00
+  lang:
+  - swift
+  agent:
+  - claude
+  ref_count: 2
+  category: skill
+.claude/skills/swift-concurrency-pro/references/hotspots.md:
+  original_sha: 199a9fa4beea4a550b3f63e07cddd441d72fd41d1e17e6f3255071a661ce1e6d
+  template_version: 5
+  installed_date: 2026-10-22T09:12:19.350747+00:00
+  lang:
+  - swift
+  agent: []
+  ref_count: 1
+  category: skill
+.claude/skills/swift-concurrency-pro/references/new-features.md:
+  original_sha: c721a187b57e9d94112972c9685c57f7129187df2d36add4df1a9c9e9aa9e541
+  template_version: 5
+  installed_date: 2026-10-22T09:12:19.351377+00:00
+  lang:
+  - swift
+  agent: []
+  ref_count: 1
+  category: skill
+.claude/skills/swift-testing-pro/references/writing-better-tests.md:
+  original_sha: 25da3455f6cec4f10d3dff0bf3e8e1372568c75691916541b4d517f451cb8bf1
+  template_version: 5
+  installed_date: 2026-10-22T09:12:19.355639+00:00
+  lang:
+  - swift
+  agent: []
+  ref_count: 1
+  category: skill
+CLAUDE.md:
+  original_sha: eb7e86a5cd044d553afc7d464e33eea906f229a5637979cde2e864e0cf573cfa
+  template_version: 5
+  installed_date: 2026-10-22T09:12:19.346396+00:00
+  lang: []
+  agent:
+  - claude
+  ref_count: 1
+  category: agent
+.github/prompts/init-session.prompt.md:
+  original_sha: 44e08a0ddf49895b4ab13a4263f8f3b03e3f07118fd5ffcba7491ef42e977f32
+  template_version: 0
+  installed_date: 2026-10-22T09:12:08.581847+00:00
+  lang: []
+  agent: []
+  ref_count: 0
+  category: command
+.agents/skills/swift-concurrency-pro/references/bridging.md:
+  original_sha: c8eb60dcdd90f67cb3b8b1213fc55a56dd5c4a04f465d7aff7fdbd5c451e0498
+  template_version: 5
+  installed_date: 2026-10-22T09:12:19.348692+00:00
+  lang:
+  - swift
+  agent: []
+  ref_count: 1
+  category: skill
+.claude/skills/swift-concurrency-pro/references/bridging.md:
+  original_sha: c8eb60dcdd90f67cb3b8b1213fc55a56dd5c4a04f465d7aff7fdbd5c451e0498
+  template_version: 5
+  installed_date: 2026-10-22T09:12:19.351510+00:00
+  lang:
+  - swift
+  agent: []
+  ref_count: 1
+  category: skill
+.agents/skills/swift-concurrency-pro/assets/swift-concurrency-pro-icon.png:
+  original_sha: f1552e2844ae6382bd2575f40c48e0f199db2b42574aa1bdcb87ec92ddc901a1
+  template_version: 5
+  installed_date: 2026-10-22T09:12:19.350235+00:00
+  lang:
+  - swift
+  agent: []
+  ref_count: 1
+  category: skill
+.agents/skills/swift-build-commands/SKILL.md:
+  original_sha: 94b1beb40d4c5f2328899c3f277551f3b182ad55959242d945a458225f53612f
+  template_version: 5
+  installed_date: 2026-10-22T09:12:19.347273+00:00
+  lang:
+  - swift
+  agent: []
+  ref_count: 1
+  category: skill
+.agents/skills/swift-concurrency-pro/references/testing.md:
+  original_sha: 4a1fc1aefb572bbdbd75a502a74df795af7e2212eec6836a4f353f9b725abffc
+  template_version: 5
+  installed_date: 2026-10-22T09:12:19.348266+00:00
+  lang:
+  - swift
+  agent: []
+  ref_count: 1
+  category: skill
+.agents/skills/swift-testing-pro/references/migrating-from-xctest.md:
+  original_sha: 35b64812402ad1d15b496993e1721daaf4e80672bf9cce47078f772fd271f93f
+  template_version: 5
+  installed_date: 2026-10-22T09:12:19.353567+00:00
+  lang:
+  - swift
+  agent: []
+  ref_count: 1
+  category: skill
+.agents/skills/swift-concurrency-pro/references/structured.md:
+  original_sha: 1655b610fd1dafb7cf42b61457ff8229117c06879d0e9cc40460f437ba97895b
+  template_version: 5
+  installed_date: 2026-10-22T09:12:19.347691+00:00
+  lang:
+  - swift
+  agent: []
+  ref_count: 1
+  category: skill
+.claude/skills/swift-concurrency-pro/assets/swift-concurrency-pro-icon.png:
+  original_sha: f1552e2844ae6382bd2575f40c48e0f199db2b42574aa1bdcb87ec92ddc901a1
+  template_version: 5
+  installed_date: 2026-10-22T09:12:19.352901+00:00
+  lang:
+  - swift
+  agent: []
+  ref_count: 1
+  category: skill
+.claude/skills/swift-concurrency-pro/assets/swift-concurrency-pro-icon.svg:
+  original_sha: da92910ec6329966729d6e9bcd27bb2be8c079d95b779c1081641dd9b64a344a
+  template_version: 5
+  installed_date: 2026-10-22T09:12:19.353038+00:00
+  lang:
+  - swift
+  agent: []
+  ref_count: 1
+  category: skill
+.claude/skills/swift-testing-pro/.claude-plugin/plugin.json:
+  original_sha: ce277427d557d776102a6768d85432fbfdc4a6930ee20ddef0a9418fe9351f84
+  template_version: 5
+  installed_date: 2026-10-22T09:12:19.356213+00:00
+  lang:
+  - swift
+  agent: []
+  ref_count: 1
+  category: skill
+.agents/skills/swift-concurrency-pro/.claude-plugin/plugin.json:
+  original_sha: 2f3669516dfa9bcdb47b49abdcc1f9ba2d90fbdab576cefadb288439c707a56b
+  template_version: 5
+  installed_date: 2026-10-22T09:12:19.349638+00:00
+  lang:
+  - swift
+  agent: []
+  ref_count: 1
+  category: skill
+.claude/skills/swift-concurrency-pro/references/actors.md:
+  original_sha: 7a77a0f06d0040a6813ec02cd4b1360df4bcfa501f93710bfb4296de9911d64f
+  template_version: 5
+  installed_date: 2026-10-22T09:12:19.351258+00:00
+  lang:
+  - swift
+  agent: []
+  ref_count: 1
+  category: skill
+.claude/skills/semantic-versioning/SKILL.md:
+  original_sha: d313d5c1a851aaf9b8cebc250e280cbe37bc70fdb06d95f74de6b60eafdf5f4d
+  template_version: 5
+  installed_date: 2026-10-22T09:12:19.357743+00:00
+  lang:
+  - swift
+  agent:
+  - claude
+  ref_count: 2
+  category: skill
+.editorconfig:
+  original_sha: 69d67c19a6c69084c1e611f1cf0d2f391fcb2bbd2a1c471a1adb18d01465109e
+  template_version: 5
+  installed_date: 2026-10-22T09:12:19.346115+00:00
+  lang:
+  - swift
+  agent: []
+  ref_count: 1
+  category: language
+.claude/skills/swift-concurrency-pro/references/structured.md:
+  original_sha: 1655b610fd1dafb7cf42b61457ff8229117c06879d0e9cc40460f437ba97895b
+  template_version: 5
+  installed_date: 2026-10-22T09:12:19.350623+00:00
+  lang:
+  - swift
+  agent: []
+  ref_count: 1
+  category: skill
+.claude/skills/swift-concurrency-pro/skills/swift-concurrency-pro/SKILL.md:
+  original_sha: 809362b3e932b3bbf9b3f2f79953bae617573e3e24ea135576bbc1b020d89ce0
+  template_version: 5
+  installed_date: 2026-10-22T09:12:19.352720+00:00
+  lang:
+  - swift
+  agent: []
+  ref_count: 1
+  category: skill
+.agents/skills/swift-testing-pro/references/core-rules.md:
+  original_sha: 2271efdca6c2b7b3365501172147884b6e786bcee7bef680fb4f4718929d6180
+  template_version: 5
+  installed_date: 2026-10-22T09:12:19.353836+00:00
+  lang:
+  - swift
+  agent: []
+  ref_count: 1
+  category: skill
+.agents/skills/swift-concurrency-pro/references/actors.md:
+  original_sha: 7a77a0f06d0040a6813ec02cd4b1360df4bcfa501f93710bfb4296de9911d64f
+  template_version: 5
+  installed_date: 2026-10-22T09:12:19.348413+00:00
+  lang:
+  - swift
+  agent: []
+  ref_count: 1
+  category: skill
+.agents/skills/swift-concurrency-pro/SKILL.md:
+  original_sha: 95d3098b038a38f163259cb7404070f786fed846a5e8b864e6b34fa7600247f9
+  template_version: 5
+  installed_date: 2026-10-22T09:12:19.349789+00:00
+  lang:
+  - swift
+  agent: []
+  ref_count: 1
+  category: skill
+.claude/skills/swift-testing-pro/SKILL.md:
+  original_sha: ad4f1bff44b5b7fce20b282481e651876efce024d13b16cb969bc433036ac059
+  template_version: 5
+  installed_date: 2026-10-22T09:12:19.356370+00:00
+  lang:
+  - swift
+  agent: []
+  ref_count: 1
+  category: skill
+.agents/skills/swift-testing-pro/.claude-plugin/plugin.json:
+  original_sha: ce277427d557d776102a6768d85432fbfdc4a6930ee20ddef0a9418fe9351f84
+  template_version: 5
+  installed_date: 2026-10-22T09:12:19.354231+00:00
+  lang:
+  - swift
+  agent: []
+  ref_count: 1
+  category: skill
+.agents/skills/swift-concurrency-pro/references/new-features.md:
+  original_sha: c721a187b57e9d94112972c9685c57f7129187df2d36add4df1a9c9e9aa9e541
+  template_version: 5
+  installed_date: 2026-10-22T09:12:19.348548+00:00
+  lang:
+  - swift
+  agent: []
+  ref_count: 1
+  category: skill
+.claude/skills/swift-concurrency-pro/references/async-streams.md:
+  original_sha: 589ba0dad544b28b158702e239fe6a4077b6d1484c83b8fd51290192bf1ffc9a
+  template_version: 5
+  installed_date: 2026-10-22T09:12:19.351001+00:00
+  lang:
+  - swift
+  agent: []
+  ref_count: 1
+  category: skill
+.claude/skills/swift-testing-pro/references/migrating-from-xctest.md:
+  original_sha: 35b64812402ad1d15b496993e1721daaf4e80672bf9cce47078f772fd271f93f
+  template_version: 5
+  installed_date: 2026-10-22T09:12:19.355487+00:00
+  lang:
+  - swift
+  agent: []
+  ref_count: 1
+  category: skill
+.agents/skills/semantic-versioning/SKILL.md:
+  original_sha: d313d5c1a851aaf9b8cebc250e280cbe37bc70fdb06d95f74de6b60eafdf5f4d
+  template_version: 5
+  installed_date: 2026-10-22T09:12:19.357541+00:00
+  lang:
+  - swift
+  agent:
+  - claude
+  ref_count: 2
+  category: skill
+.agents/skills/recent-updates/SKILL.md:
+  original_sha: 27fbb14192738a4e76042bf7322b4b529f4996354fa427700624deccd3ef6dc9
+  template_version: 5
+  installed_date: 2026-10-22T09:12:19.357979+00:00
+  lang:
+  - swift
+  agent:
+  - claude
+  ref_count: 2
+  category: skill
+.agents/skills/swift-testing-pro/references/async-tests.md:
+  original_sha: bc6e0eabd10377b5796e9e554a4965a78b7d1aaba8f11021c2a63b6e8a9e669a
+  template_version: 5
+  installed_date: 2026-10-22T09:12:19.353286+00:00
+  lang:
+  - swift
+  agent: []
+  ref_count: 1
+  category: skill
+.claude/skills/swift-concurrency-pro/references/interop.md:
+  original_sha: b86cd716bd22b38d718e86b37b3d7dd1225b5ce93a53f88842ff6993e93ca566
+  template_version: 5
+  installed_date: 2026-10-22T09:12:19.350868+00:00
+  lang:
+  - swift
+  agent: []
+  ref_count: 1
+  category: skill
+.claude/skills/swift-concurrency-pro/references/bug-patterns.md:
+  original_sha: 2233f58e784a9b6cf13620133485fcf7e3150192a40e713369ebbddc820dec85
+  template_version: 5
+  installed_date: 2026-10-22T09:12:19.351639+00:00
+  lang:
+  - swift
+  agent: []
+  ref_count: 1
+  category: skill
+.agents/skills/swift-concurrency-pro/references/interop.md:
+  original_sha: b86cd716bd22b38d718e86b37b3d7dd1225b5ce93a53f88842ff6993e93ca566
+  template_version: 5
+  installed_date: 2026-10-22T09:12:19.347979+00:00
+  lang:
+  - swift
+  agent: []
+  ref_count: 1
+  category: skill
+.agents/skills/swift-concurrency-pro/assets/swift-concurrency-pro-icon.svg:
+  original_sha: da92910ec6329966729d6e9bcd27bb2be8c079d95b779c1081641dd9b64a344a
+  template_version: 5
+  installed_date: 2026-10-22T09:12:19.350375+00:00
+  lang:
+  - swift
+  agent: []
+  ref_count: 1
+  category: skill
+.claude/skills/swift-concurrency-pro/references/unstructured.md:
+  original_sha: d8063edf18bbe5abc9c628548b0100c4dd8defe3340c017d6fa4936eca17c456
+  template_version: 5
+  installed_date: 2026-10-22T09:12:19.352018+00:00
+  lang:
+  - swift
+  agent: []
+  ref_count: 1
+  category: skill
+.claude/skills/git-workflow/SKILL.md:
+  original_sha: e77221a6957de986cdd456c69f80d4009ac8bf5e118a3e926c47260746ae92be
+  template_version: 5
+  installed_date: 2026-10-22T09:12:19.357357+00:00
+  lang:
+  - swift
+  agent:
+  - claude
+  ref_count: 2
+  category: skill
+.claude/skills/swift-concurrency-pro/references/diagnostics.md:
+  original_sha: cc2debc6f430ed13fc3be3a7ce942e55bb1cf02a9804ebfb272f295b502c9569
+  template_version: 5
+  installed_date: 2026-10-22T09:12:19.351892+00:00
+  lang:
+  - swift
+  agent: []
+  ref_count: 1
+  category: skill
+.claude/skills/swift-concurrency-pro/agents/openai.yaml:
+  original_sha: c9aeb1a570575ef05eecfabf4657236591081f7c13cb832d6029981f7d72e0dc
+  template_version: 5
+  installed_date: 2026-10-22T09:12:19.352198+00:00
+  lang:
+  - swift
+  agent: []
+  ref_count: 1
+  category: skill
+.claude/skills/swift-build-commands/SKILL.md:
+  original_sha: 94b1beb40d4c5f2328899c3f277551f3b182ad55959242d945a458225f53612f
+  template_version: 5
+  installed_date: 2026-10-22T09:12:19.347433+00:00
+  lang:
+  - swift
+  agent: []
+  ref_count: 1
+  category: skill
+UPDATES.md:
+  original_sha: ff56fd563cb60b9073230b3b0721e5687c98fd7888129b47f2bbc557e9c9c940
+  template_version: 5
+  installed_date: 2026-10-22T09:12:19.346263+00:00
+  lang: []
+  agent: []
+  ref_count: 0
+  category: integration
+.claude/commands/init-session.md:
+  original_sha: 0d2fd81c4fbae776c4b4f050bd0394e913796c6e597297487ca34d8e78ec5d7d
+  template_version: 5
+  installed_date: 2026-10-22T09:12:19.346597+00:00
+  lang: []
+  agent:
+  - claude
+  ref_count: 1
+  category: agent
+.agents/skills/swift-concurrency-pro/references/bug-patterns.md:
+  original_sha: 2233f58e784a9b6cf13620133485fcf7e3150192a40e713369ebbddc820dec85
+  template_version: 5
+  installed_date: 2026-10-22T09:12:19.348826+00:00
+  lang:
+  - swift
+  agent: []
+  ref_count: 1
+  category: skill
+.claude/skills/swift-coding-conventions/SKILL.md:
+  original_sha: 738471cb53200d3033f15fac96666da391e28d1405154662307716836b6b881c
+  template_version: 5
+  installed_date: 2026-10-22T09:12:19.347105+00:00
+  lang:
+  - swift
+  agent: []
+  ref_count: 1
+  category: skill
+.claude/skills/swift-testing-pro/assets/swift-testing-pro-icon.svg:
+  original_sha: 92d3d0b2855da2404beaacd3ea574b79a26535c9d99a0739edfd5e35d764a9e0
+  template_version: 5
+  installed_date: 2026-10-22T09:12:19.356944+00:00
+  lang:
+  - swift
+  agent: []
+  ref_count: 1
+  category: skill
+.agents/skills/swift-testing-pro/assets/swift-testing-pro-icon.svg:
+  original_sha: 92d3d0b2855da2404beaacd3ea574b79a26535c9d99a0739edfd5e35d764a9e0
+  template_version: 5
+  installed_date: 2026-10-22T09:12:19.354973+00:00
+  lang:
+  - swift
+  agent: []
+  ref_count: 1
+  category: skill
+.swift-format:
+  original_sha: 7ccc8ef070d07e464776c19ebf277a07854369b5532bd33c3cd501e1d4381584
+  template_version: 5
+  installed_date: 2026-10-22T09:12:19.345958+00:00
+  lang:
+  - swift
+  agent: []
+  ref_count: 1
+  category: language
+.agents/skills/swift-concurrency-pro/references/diagnostics.md:
+  original_sha: cc2debc6f430ed13fc3be3a7ce942e55bb1cf02a9804ebfb272f295b502c9569
+  template_version: 5
+  installed_date: 2026-10-22T09:12:19.349095+00:00
+  lang:
+  - swift
+  agent: []
+  ref_count: 1
+  category: skill
+.agents/skills/swift-testing-pro/agents/openai.yaml:
+  original_sha: f7a35b0befd4eb136cf87047543379a63efebb4f0f7eb4490489325d09383c4f
+  template_version: 5
+  installed_date: 2026-10-22T09:12:19.354021+00:00
+  lang:
+  - swift
+  agent: []
+  ref_count: 1
+  category: skill
+.agents/skills/swift-concurrency-pro/agents/openai.yaml:
+  original_sha: c9aeb1a570575ef05eecfabf4657236591081f7c13cb832d6029981f7d72e0dc
+  template_version: 5
+  installed_date: 2026-10-22T09:12:19.349442+00:00
+  lang:
+  - swift
+  agent: []
+  ref_count: 1
+  category: skill
+.agents/skills/swift-concurrency-pro/references/unstructured.md:
+  original_sha: d8063edf18bbe5abc9c628548b0100c4dd8defe3340c017d6fa4936eca17c456
+  template_version: 5
+  installed_date: 2026-10-22T09:12:19.349238+00:00
+  lang:
+  - swift
+  agent: []
+  ref_count: 1
+  category: skill
+AGENTS.md:
+  original_sha: eed04e09004791cde76c20c0e39a0973e3649c7ea7358e414c2cf400ade34698
+  template_version: 5
+  installed_date: 2026-10-22T09:12:19.345625+00:00
+  lang:
+  - swift
+  agent:
+  - claude
+  ref_count: 2
+  category: main
