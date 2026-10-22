@@ -15,7 +15,7 @@ All milestones are implemented on `feature/code-review`; `Scripts/check-coverage
 | M2 monitoring | `refactor(kit)!: stop monitoring when the stream ends` | `ReadingMonitor`, `MonitorSchedule` suites |
 | M3 client over the seam | `refactor(kit)!: isolate the client on the main actor` | session, registry, scan, read, monitor suites over `FakeBluetoothCentral` |
 | M4 CLI | `refactor(cli)!: route commands through an environment`, `test(cli): cover every command path` | every command path, exit tests, spinner, JSON writer |
-| M5 gate | `test: gate line coverage at 100 percent` | 240+ tests, Thread Sanitizer green, gate at 100 |
+| M5 gate | `test: gate line coverage at 100 percent`, `test: cover the last client lines and list them exactly` | 251 tests, 1807/1807 lines, Thread Sanitizer green, gate at 100 |
 
 Lessons recorded while landing the plan:
 
