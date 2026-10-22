@@ -5,27 +5,44 @@ import Testing
 
 @testable import AranetKit
 
+/// Reading characteristics as test arguments; `CBUUID` itself is not `Sendable`, which parameterized tests require.
+enum ReadingCharacteristic: Sendable {
+    case aranet4Detailed
+    case aranet4Basic
+    case unknown
+    case typedPaired
+    case typedDetailed
+
+    static let aranet4: [ReadingCharacteristic] = [.aranet4Detailed, .aranet4Basic, .unknown]
+    static let typed: [ReadingCharacteristic] = [.typedPaired, .typedDetailed]
+
+    var uuid: CBUUID? {
+        switch self {
+            case .aranet4Detailed:
+                return AranetUUID.characteristicCurrentReadingsDetailed
+            case .aranet4Basic:
+                return AranetUUID.characteristicCurrentReadings
+            case .unknown:
+                return nil
+            case .typedPaired:
+                return AranetUUID.characteristicCurrentReadingsAR2
+            case .typedDetailed:
+                return AranetUUID.characteristicCurrentReadingsAR2Detailed
+        }
+    }
+}
+
 @Suite(.tags(.parsing))
 struct AranetPayloadParserTests {
-    private static let aranet4Characteristics: [CBUUID?] = [
-        AranetUUID.characteristicCurrentReadingsDetailed,
-        AranetUUID.characteristicCurrentReadings,
-        nil
-    ]
-    private static let typedCharacteristics: [CBUUID?] = [
-        AranetUUID.characteristicCurrentReadingsAR2,
-        AranetUUID.characteristicCurrentReadingsAR2Detailed
-    ]
-
     private func parse(_ data: Data, characteristic: CBUUID? = AranetUUID.characteristicCurrentReadingsDetailed) throws -> AranetReading {
         return try AranetPayloadParser.reading(from: data, characteristic: characteristic, name: "Aranet TEST", version: "v1.2.3")
     }
 
     // MARK: - Aranet4
 
-    @Test("Aranet4 detailed payload decodes every field", arguments: AranetPayloadParserTests.aranet4Characteristics)
-    func aranet4DetailedPayload(characteristic: CBUUID?) throws -> Void {
-        let reading = try self.parse(PayloadFixtures.aranet4Detailed, characteristic: characteristic)
+    @Test("Aranet4 detailed payload decodes every field", arguments: ReadingCharacteristic.aranet4)
+    func aranet4DetailedPayload(characteristic: ReadingCharacteristic) throws -> Void {
+        let reading = try self.parse(PayloadFixtures.aranet4Detailed, characteristic: characteristic.uuid)
 
         #expect(reading.deviceType == .aranet4)
         #expect(reading.name == "Aranet TEST")
@@ -100,9 +117,9 @@ struct AranetPayloadParserTests {
 
     // MARK: - Aranet Radiation
 
-    @Test("Paired radiation payload divides the rate by ten", arguments: AranetPayloadParserTests.typedCharacteristics)
-    func radiationPairedPayload(characteristic: CBUUID?) throws -> Void {
-        let reading = try self.parse(PayloadFixtures.radiationPaired, characteristic: characteristic)
+    @Test("Paired radiation payload divides the rate by ten", arguments: ReadingCharacteristic.typed)
+    func radiationPairedPayload(characteristic: ReadingCharacteristic) throws -> Void {
+        let reading = try self.parse(PayloadFixtures.radiationPaired, characteristic: characteristic.uuid)
 
         #expect(reading.deviceType == .aranetRadiation)
         #expect(reading.radiationRate == Measurement(value: 120, unit: UnitRadiationDose.nanosieverts))
@@ -116,9 +133,9 @@ struct AranetPayloadParserTests {
         #expect(reading.co2 == nil)
     }
 
-    @Test("Detailed radiation payload keeps the rate as transmitted", arguments: AranetPayloadParserTests.typedCharacteristics)
-    func radiationDetailedPayload(characteristic: CBUUID?) throws -> Void {
-        let reading = try self.parse(PayloadFixtures.radiationDetailed, characteristic: characteristic)
+    @Test("Detailed radiation payload keeps the rate as transmitted", arguments: ReadingCharacteristic.typed)
+    func radiationDetailedPayload(characteristic: ReadingCharacteristic) throws -> Void {
+        let reading = try self.parse(PayloadFixtures.radiationDetailed, characteristic: characteristic.uuid)
 
         #expect(reading.radiationRate == Measurement(value: 120, unit: UnitRadiationDose.nanosieverts))
         #expect(reading.radiationTotal?.value == 1_234_567)
@@ -156,9 +173,9 @@ struct AranetPayloadParserTests {
 
     // MARK: - Aranet2
 
-    @Test("Aranet2 payload decodes temperature and humidity", arguments: AranetPayloadParserTests.typedCharacteristics)
-    func aranet2Payload(characteristic: CBUUID?) throws -> Void {
-        let reading = try self.parse(PayloadFixtures.aranet2, characteristic: characteristic)
+    @Test("Aranet2 payload decodes temperature and humidity", arguments: ReadingCharacteristic.typed)
+    func aranet2Payload(characteristic: ReadingCharacteristic) throws -> Void {
+        let reading = try self.parse(PayloadFixtures.aranet2, characteristic: characteristic.uuid)
 
         #expect(reading.deviceType == .aranet2)
         #expect(reading.temperature == Measurement(value: 19.25, unit: UnitTemperature.celsius))
