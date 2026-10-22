@@ -120,7 +120,7 @@ When initializing a session or analyzing the workspace, refer to instruction fil
 - Layout: `Tests/AranetKitTests/` and `Tests/AranetCliTests/` mirror `Sources/`, with shared fixtures in `Fixtures/`, test doubles in `Fakes/`, and tags in `Tags.swift`; the CLI suite uses `@testable import AranetCli`
 - Tests first: add or update the test before the production change it covers
 - Coverage: `Scripts/check-coverage.sh` runs the suites with code coverage and fails below `COVERAGE_THRESHOLD` (default set in the script and raised per `TEST_PLAN.md` milestone, ending at 100); region coverage is reported but not gated; the only excluded file is the CoreBluetooth delegate adapter, which needs real peripherals
-- CI: `build.yml` runs the coverage script and a Thread Sanitizer job (`swift test --sanitize=thread`), the `release.yml` dry run runs `swift test`, and `lint.yml` lints `Tests` as well as `Sources`
+- CI: `build.yml` runs the coverage script and a Thread Sanitizer job (`swift test --sanitize=thread`), the `release.yml` dry run runs `swift test`, and `lint.yml` lints `Tests` as well as `Sources`; the CLI exit tests skip themselves under the sanitizer, whose child process produces no output (`ExitTestSupport`)
 - Integration: manual runs against real devices with `swift run aranet-cli <command> --verbose`; CoreBluetooth is not mocked at the framework level, the `BluetoothCentral` seam is faked instead (from milestone M3 of `TEST_PLAN.md`)
 
 ### Documentation

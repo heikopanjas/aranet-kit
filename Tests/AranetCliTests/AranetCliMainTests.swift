@@ -4,7 +4,7 @@ import Testing
 @testable import AranetCli
 
 /// Exit tests run the entry point in a child process, so the `Never`-returning exit paths are covered too.
-@Suite(.tags(.cli))
+@Suite(.tags(.cli), .enabled(if: ExitTestSupport.isAvailable, "Exit tests cannot run under Thread Sanitizer"))
 struct AranetCliMainTests {
     private static let observed: [any PartialKeyPath<ExitTest.Result> & Sendable] = [\.standardOutputContent, \.standardErrorContent]
 
@@ -12,9 +12,13 @@ struct AranetCliMainTests {
         return String(decoding: result?.standardOutputContent ?? [], as: UTF8.self)
     }
 
-    /// The child's standard error, shown when an expectation fails so a crash in the child is diagnosable.
-    private static func stderr(_ result: ExitTest.Result?) -> Comment {
-        return Comment(rawValue: "stderr: " + String(decoding: result?.standardErrorContent ?? [], as: UTF8.self))
+    private static func stderr(_ result: ExitTest.Result?) -> String {
+        return String(decoding: result?.standardErrorContent ?? [], as: UTF8.self)
+    }
+
+    /// The child's standard error as a comment, shown when an expectation fails so a crash in the child is diagnosable.
+    private static func diagnostics(_ result: ExitTest.Result?) -> Comment {
+        return Comment(rawValue: "stderr: " + Self.diagnostics(result))
     }
 
     @Test("--version prints the version and exits successfully")
@@ -23,7 +27,7 @@ struct AranetCliMainTests {
             await AranetCliMain.run(arguments: ["--version"])
         }
 
-        #expect(Self.stdout(result).contains("4.0.0") == true, Self.stderr(result))
+        #expect(Self.stdout(result).contains("4.0.0") == true, Self.diagnostics(result))
     }
 
     @Test("No arguments prints help and exits successfully")
@@ -32,7 +36,7 @@ struct AranetCliMainTests {
             await AranetCliMain.run(arguments: [])
         }
 
-        #expect(Self.stdout(result).contains("USAGE") == true, Self.stderr(result))
+        #expect(Self.stdout(result).contains("USAGE") == true, Self.diagnostics(result))
     }
 
     @Test("--json alone still prints help")
@@ -41,7 +45,7 @@ struct AranetCliMainTests {
             await AranetCliMain.run(arguments: ["--json"])
         }
 
-        #expect(Self.stdout(result).contains("USAGE") == true, Self.stderr(result))
+        #expect(Self.stdout(result).contains("USAGE") == true, Self.diagnostics(result))
     }
 
     @Test("A parse error exits with the usage code")
@@ -50,7 +54,7 @@ struct AranetCliMainTests {
             await AranetCliMain.run(arguments: ["scan", "--bogus"])
         }
 
-        #expect(Self.stdout(result).isEmpty == true, Self.stderr(result))
+        #expect(Self.stderr(result).contains("Unknown option '--bogus'") == true, Self.diagnostics(result))
     }
 
     @Test("A parse error in JSON mode is reported as a JSON line on standard output")
@@ -60,7 +64,7 @@ struct AranetCliMainTests {
         }
 
         let output = Self.stdout(result)
-        #expect(output.hasPrefix("{\"error\":") == true, Self.stderr(result))
+        #expect(output.hasPrefix("{\"error\":") == true, Self.diagnostics(result))
         #expect(output.contains("bogus") == true)
     }
 
@@ -70,7 +74,7 @@ struct AranetCliMainTests {
             await AranetCliMain.run(arguments: ["monitor"])
         }
 
-        #expect(Self.stdout(result).isEmpty == true, Self.stderr(result))
+        #expect(Self.stderr(result).contains("Missing expected argument") == true, Self.diagnostics(result))
     }
 
     @Test("The entry point runs the configured arguments")
@@ -81,6 +85,6 @@ struct AranetCliMainTests {
             }
         }
 
-        #expect(Self.stdout(result).contains("4.0.0") == true, Self.stderr(result))
+        #expect(Self.stdout(result).contains("4.0.0") == true, Self.diagnostics(result))
     }
 }
