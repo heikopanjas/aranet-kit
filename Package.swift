@@ -6,7 +6,7 @@ import PackageDescription
 let package = Package(
     name: "AranetCli",
     platforms: [
-        .macOS(.v12)
+        .macOS(.v13)
     ],
     products: [
         // Library product for AranetKit
@@ -34,6 +34,19 @@ let package = Package(
             name: "AranetCli",
             dependencies: [
                 "AranetKit",
+                .product(name: "ArgumentParser", package: "swift-argument-parser")
+            ]
+        ),
+        // Unit tests for the library (no Bluetooth hardware required)
+        .testTarget(
+            name: "AranetKitTests",
+            dependencies: ["AranetKit"]
+        ),
+        // Unit tests for the CLI presentation layer
+        .testTarget(
+            name: "AranetCliTests",
+            dependencies: [
+                "AranetCli",
                 .product(name: "ArgumentParser", package: "swift-argument-parser")
             ]
         )

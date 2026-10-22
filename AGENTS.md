@@ -28,7 +28,7 @@ Key features:
 
 ## Technology Stack
 
-- **Language:** Swift 6.2+ (swift-tools-version 6.2), macOS 12+
+- **Language:** Swift 6.2+ (swift-tools-version 6.2), macOS 13+
 - **Framework:** Swift Argument Parser (CLI), CoreBluetooth (Bluetooth LE), Foundation Units
 - **Version Control:** Git (`develop` for development, `main` for releases)
 - **Package Manager:** Swift Package Manager (SPM)
@@ -93,7 +93,7 @@ When initializing a session or analyzing the workspace, refer to instruction fil
 1. **Maintain Consistency**: Keep code style consistent across the codebase
 2. **Test First**: Write tests before implementing features when applicable
 3. **Document Changes**: Update documentation when changing functionality
-4. **Code Review**: Before committing, check the change against the Development Guidelines below; it must build without warnings and pass `xcrun swift-format lint --configuration .swift-format --recursive --strict Sources` (the CI `lint` job)
+4. **Code Review**: Before committing, check the change against the Development Guidelines below; it must build without warnings and pass `xcrun swift-format lint --configuration .swift-format --recursive --strict Sources` (the CI `lint` job); findings and the phased fix plan from the 2026-10-22 review live in `CODE_REVIEW.md`
 5. **Date Changes**: Update the "Last updated" timestamp in this file when making changes
 6. **Log Updates**: Add entries to the "Recent Updates & Decisions" log in `UPDATES.md`
 
@@ -116,12 +116,12 @@ When initializing a session or analyzing the workspace, refer to instruction fil
 
 ### Testing
 
-The package currently has no test target. CI verifies that debug and release builds succeed, that the binary is `arm64` (`Scripts/verify-binary-architecture.sh`), and that sources pass strict swift-format linting. Bluetooth behavior is verified manually against real devices with `swift run aranet-cli <command> --verbose`.
-
-- Unit tests: `Tests/AranetKitTests/` when added, covering byte parsing and unit conversion without Bluetooth hardware (load the `swift-testing-pro` skill)
-- Integration tests: manual runs against real devices; CoreBluetooth is not mocked
-- Test coverage requirements: none yet
-- Testing framework: Swift Testing
+- Testing framework: Swift Testing, run with `swift test`; load the `swift-testing-pro` skill before writing or reviewing tests
+- Layout: `Tests/AranetKitTests/` and `Tests/AranetCliTests/` mirror `Sources/`, with shared fixtures in `Fixtures/`, test doubles in `Fakes/`, and tags in `Tags.swift`; the CLI suite uses `@testable import AranetCli`
+- Tests first: add or update the test before the production change it covers; every new line in `Sources/` must be reached by a test or the gate fails
+- Coverage: `Scripts/check-coverage.sh` runs the suites with code coverage and fails below `COVERAGE_THRESHOLD`, which defaults to 100; it prints a per-file table and the uncovered line ranges of any file below 100%; region coverage is reported but not gated; the only excluded file is `CoreBluetoothCentral.swift`, the CoreBluetooth delegate adapter that also hosts `AranetClient.init()` and `AranetClient.makeLive`, because all of them need a real `CBCentralManager`
+- CI: `build.yml` runs the coverage script and a Thread Sanitizer job (`swift test --sanitize=thread`), the `release.yml` dry run runs `swift test`, and `lint.yml` lints `Tests` as well as `Sources`; the CLI exit tests skip themselves under the sanitizer, whose child process produces no output (`ExitTestSupport`)
+- Integration: manual runs against real devices with `swift run aranet-cli <command> --verbose`; CoreBluetooth is not mocked at the framework level, the `BluetoothCentral` seam is faked instead (from milestone M3 of `TEST_PLAN.md`)
 
 ### Documentation
 
@@ -157,13 +157,21 @@ public class AranetClient {
     func monitor(from device: AranetDevice) -> AsyncStream<Result<AranetReading, Error>>
 }
 
-// CLI: Command handling and presentation
-@main
-struct AranetCLI: AsyncParsableCommand {
-    @Command var read: ReadCommand
-    @Command var scan: ScanCommand
+// CLI: one file per command; every side effect goes through the task-local CliEnvironment
+struct CliEnvironment: Sendable {
+    var makeClient: @MainActor @Sendable () -> any SensorClient
+    var write: @Sendable (String) -> Void          // standard output
+    var writeError: @Sendable (String) -> Void     // standard error
+    var isTerminal: Bool                           // spinner gate
+    var now: @Sendable () -> Date                  // monitor timestamps
+    var arguments: [String]                        // for --json detection before parsing
+    var interrupts: @Sendable () -> AsyncStream<Void>  // Ctrl+C
+
+    @TaskLocal static var current = CliEnvironment.live
 }
 ```
+
+Commands never call `print`, `Date()`, `isatty`, or `AranetClient()` directly; they read `CliEnvironment.current`. Tests install a fake environment with the `.cli()` trait in `Tests/AranetCliTests/CliTestContext.swift`. The `Never`-returning exit paths in `AranetCliMain` are covered by Swift Testing exit tests; the exit decision itself is the pure `ExitPlan`.
 
 ### Public API Surface
 
@@ -177,20 +185,22 @@ public struct AranetDevice: Identifiable, Hashable, Sendable {
 }
 ```
 
-### Sendable Conformance for CoreBluetooth
+### Main-Actor Isolation and the Bluetooth Seam
 
-CoreBluetooth types are not Sendable. Use `@unchecked Sendable` wrapper pattern:
+`AranetClient` is `@MainActor` and talks to CoreBluetooth only through the internal `BluetoothCentral` protocol. `CoreBluetoothCentral` owns the `CBCentralManager` (delegate queue `.main`), implements the delegate methods as `nonisolated` forwarders that use `MainActor.assumeIsolated`, and emits `BluetoothEvent` values through the client's event handler. The public `AranetClient.init()` and the `AranetClient.makeLive` factory live in that file as an extension (the one exception to one type per file), so every line that constructs a CoreBluetooth object sits in the single file excluded from the coverage gate. No `@unchecked Sendable` is needed on the client; `CBUUID` carries a retroactive unchecked conformance because it is immutable.
 
 ```swift
 @MainActor
-public class AranetClient: NSObject, @unchecked Sendable {
-    // Bluetooth communication on main actor
+public final class AranetClient {
+    init(central: any BluetoothCentral, log:, readyTimeout:, pairingCheckDelay:, readTimeout:, sleep:)
 }
 ```
 
+Readings are posted to `NotificationCenter` from the main actor; consumers may rely on main-thread delivery.
+
 ### Concurrent Read Isolation
 
-Each read operation gets its own `ReadOperation` instance keyed by peripheral UUID in `activeOperations: [UUID: ReadOperation]`. This prevents cross-device state corruption when reading from multiple peripherals simultaneously.
+Each read is a `ReadOperation` holding a pure `ReadSession` state machine, keyed by peripheral UUID in `operations`. `ReadSession.handle(_:)` turns `BluetoothEvent` values into `ReadCommand` values, so the whole read flow is unit tested without hardware. A second read of a device still being read throws `operationInProgress`.
 
 ### Data Models
 
@@ -543,10 +553,14 @@ swift run aranet-cli scan
 swift run aranet-cli read <device> --verbose
 
 # Format code with the Xcode-bundled swift-format
-xcrun swift-format format --configuration .swift-format --in-place --recursive Sources
+xcrun swift-format format --configuration .swift-format --in-place --recursive Sources Tests
 
 # Lint code; --strict makes findings fail CI
-xcrun swift-format lint --configuration .swift-format --recursive --strict Sources
+xcrun swift-format lint --configuration .swift-format --recursive --strict Sources Tests
+
+# Run the suites and the coverage gate
+swift test
+Scripts/check-coverage.sh
 
 # Verify the arm64 release artifact
 Scripts/verify-binary-architecture.sh "$(swift build -c release --show-bin-path)/aranet-cli"

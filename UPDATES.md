@@ -4,6 +4,71 @@ This file is the append-only log of project decisions and notable changes, maint
 
 <!-- {changelog} -->
 
+### 2026-10-22 12:00 (v4.0.0, coverage gate at 100 percent)
+
+- raised coverage_threshold in scripts/check-coverage.sh to 100 and made the script list the uncovered line ranges of any file below it (test_plan.md milestone m5)
+- moved aranetclient.init() and the new aranetclient.makelive factory into corebluetoothcentral.swift so every corebluetooth construction sits in the single excluded file; the log sink uses os_log so its message is evaluated eagerly; the default sleep is the testable aranetclient.systemsleep; dead branches in the cli entry point and json error writer removed
+- fixed the client suites to wait for the fake sleeper before releasing it (timer tasks start after their bluetooth command is recorded), serialized them, and made sleepgate report empty releases; exit tests skip themselves under thread sanitizer
+- rationale: the first green run reported 99.18 percent with 15 uncovered lines, all either corebluetooth construction, defaults the fakes replace, or unreachable branches
+- version: stays 4.0.0 (joins the unreleased major)
+
+### 2026-10-22 11:05 (v4.0.0, cli over an injectable environment)
+
+- the cli reads its client, output streams, terminal flag, clock, arguments, and interrupts from the task-local clienvironment; commands live in one file each with devicescanner, errorprinter, exitplan, and spinnerticker as helpers (test_plan.md milestone m4)
+- read and monitor accept --timeout, monitor stops cleanly on ctrl+c and keeps the other devices running when one fails, the spinner only animates on a terminal, json encoding failures are reported instead of dropped
+- added aranetclitests for every command path, globaloptions, exitplan, the spinner with a fake ticker, the json writer, and exit tests for the entry point; the gate is raised once ci prints the coverage table
+- rationale: code_review.md c8, c9, c10, k10, and a3; the old cli constructed aranetclient and wrote to stdout directly, which made every command untestable
+- version: stays 4.0.0 (joins the unreleased major)
+
+### 2026-10-22 10:48 (v4.0.0, main-actor client over a bluetooth seam)
+
+- aranetclient is now a main-actor class driving corebluetooth through the bluetoothcentral protocol; corebluetoothcentral is the only file holding cbperipheral objects and is the single coverage exclusion (test_plan.md milestone m3)
+- the read flow is the pure readsession state machine; waiterregistry replaces single-slot continuations; watchdogs check operation identity; timeouts and the clock are injectable
+- added sensorclient, aranetError.operationinprogress, localizederror conformance, known-peripheral resolution without scanning, and unified-log diagnostics
+- rationale: code_review.md k1, k2, k3, k5, c2, c3, c4, c5, c6, c7, and k8; every line of the client now runs under test through the fake central
+- version: stays 4.0.0 (joins the unreleased major)
+
+### 2026-10-22 10:32 (v4.0.0, monitoring without bluetooth)
+
+- extracted the monitoring loop into readingmonitor with injected read, sleep, and publish closures, and its arithmetic into monitorschedule with a minimum delay for overdue devices (test_plan.md milestone m2)
+- monitor(from:) now builds its stream with makestream and cancels the producer task on termination, so consumers that stop iterating stop the bluetooth polling
+- raised the platform floor to macos 13 for task.sleep(for:) and the clock apis (code_review.md d4)
+- rationale: the loop mixed scheduling with corebluetooth reads and its producer outlived its consumer; with fakes every path including cancellation is tested
+- version bump: 3.5.5 to 4.0.0 (MAJOR - platform floor and monitor termination semantics change for consumers)
+
+### 2026-10-22 10:28 (v3.5.5, pure payload parser)
+
+- extracted payload parsing into aranetpayloadparser with a bounds-checked bytereader and a wiredevicetype enum for the on-wire type byte; the client only calls the parser (test_plan.md milestone m1)
+- moved the hex dump into payloadhexdump with closedrange fields instead of strings parsed at runtime
+- split aranettypes.swift into one file per type under sources/aranetkit/types and made aranetreading equatable
+- fixed secure coding support on the custom units, found by the new archiving tests
+- rationale: the parser was private to the bluetooth-bound client and read unaligned memory behind hand-placed length guards; a pure parser is testable from byte fixtures and safe by construction
+- version bump: 3.5.4 to 3.5.5 (PATCH - internal refactor, additive conformance, bug fix)
+
+### 2026-10-22 10:22 (v3.5.4, test infrastructure and first suites)
+
+- added swift testing targets for the library and the cli with suites for units, value types, errors, notifications, device matching, terminal output, and json output (test_plan.md milestone m0)
+- added scripts/check-coverage.sh, which runs the suites with code coverage, prints a per-file table, and fails below coverage_threshold; the corebluetooth delegate adapter is the single documented exclusion
+- ci: build.yml runs the coverage script and a thread sanitizer job, the release dry run runs swift test, and lint.yml lints tests too
+- rewrote the testing section in agents.md to describe the framework, layout, tests-first rule, and coverage gate
+- rationale: the package had no tests; the plan raises the gate milestone by milestone, so the infrastructure lands first with the suites that need no seams
+- version bump: 3.5.3 to 3.5.4 (PATCH - tests and ci only, no api change)
+
+### 2026-10-22 10:12 (v3.5.3, test plan for full coverage)
+
+- added test_plan.md: five milestones from test infrastructure to a 100% line coverage gate, with protocol seams for parsing, monitoring, the bluetooth central, and the cli environment so every code path runs under swift testing with fakes
+- the only excluded file is the corebluetooth delegate adapter, because its callbacks take peripheral objects that cannot be created in a test process
+- pointed the testing section in agents.md at the plan
+- rationale: the package has no tests and the code review showed the shapes that block them; tests drive the refactors milestone by milestone instead of landing after them
+- version bump: none (no code change)
+
+### 2026-10-22 09:57 (v3.5.3, code review fix plan)
+
+- added code_review.md with the findings of a full static review against the swift-coding-conventions, swift-concurrency-pro, and swift-testing-pro skills, plus a six-phase fix plan with milestones and verification commands
+- pointed the code review bullet in agents.md at that plan
+- rationale: the review found unchecked main-actor isolation in aranetclient, continuations that concurrent calls can orphan, a monitor stream whose producer outlives its consumer, and no test target; one tracked plan keeps the fixes ordered and ties the breaking ones to a 4.0.0 release
+- version bump: none (no code change)
+
 ### 2026-10-22 11:46 (v3.5.3, aranet4 payload bounds and protocol docs)
 
 - fixed aranet4 parsing: payloads shorter than 9 bytes now throw invalidData instead of crashing on byte 8, and interval and ago are only read from full 13-byte payloads instead of from 11 bytes
