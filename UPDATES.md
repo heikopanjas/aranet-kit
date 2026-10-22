@@ -4,6 +4,15 @@ This file is the append-only log of project decisions and notable changes, maint
 
 <!-- {changelog} -->
 
+### 2026-10-22 10:22 (v3.5.4, test infrastructure and first suites)
+
+- added swift testing targets for the library and the cli with suites for units, value types, errors, notifications, device matching, terminal output, and json output (test_plan.md milestone m0)
+- added scripts/check-coverage.sh, which runs the suites with code coverage, prints a per-file table, and fails below coverage_threshold; the corebluetooth delegate adapter is the single documented exclusion
+- ci: build.yml runs the coverage script and a thread sanitizer job, the release dry run runs swift test, and lint.yml lints tests too
+- rewrote the testing section in agents.md to describe the framework, layout, tests-first rule, and coverage gate
+- rationale: the package had no tests; the plan raises the gate milestone by milestone, so the infrastructure lands first with the suites that need no seams
+- version bump: 3.5.3 to 3.5.4 (PATCH - tests and ci only, no api change)
+
 ### 2026-10-22 10:12 (v3.5.3, test plan for full coverage)
 
 - added test_plan.md: five milestones from test infrastructure to a 100% line coverage gate, with protocol seams for parsing, monitoring, the bluetooth central, and the cli environment so every code path runs under swift testing with fakes

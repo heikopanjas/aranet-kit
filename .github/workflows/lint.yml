@@ -12,5 +12,5 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Lint Swift sources
-        run: xcrun swift-format lint --configuration .swift-format --recursive --strict Sources
+      - name: Lint Swift sources and tests
+        run: xcrun swift-format lint --configuration .swift-format --recursive --strict Sources Tests

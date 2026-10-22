@@ -36,6 +36,16 @@ let package = Package(
                 "AranetKit",
                 .product(name: "ArgumentParser", package: "swift-argument-parser")
             ]
+        ),
+        // Unit tests for the library (no Bluetooth hardware required)
+        .testTarget(
+            name: "AranetKitTests",
+            dependencies: ["AranetKit"]
+        ),
+        // Unit tests for the CLI presentation layer
+        .testTarget(
+            name: "AranetCliTests",
+            dependencies: ["AranetCli"]
         )
     ]
 )

@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.5.4] - 2026-10-22
+
+### Added
+
+- Swift Testing targets `AranetKitTests` and `AranetCliTests` covering units, value types, errors, notifications, device matching, terminal output, and JSON output
+- `Scripts/check-coverage.sh` runs the suites with code coverage and enforces a line coverage threshold
+
+### Changed
+
+- CI runs the unit tests with coverage, a Thread Sanitizer job, and lints `Tests` alongside `Sources`
+
 ## [3.5.3] - 2026-10-22
 
 ### Fixed

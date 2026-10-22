@@ -99,6 +99,9 @@ jobs:
         with:
           swift-version: "6.2"
 
+      - name: Run unit tests
+        run: swift test
+
       - name: Build arm64 release binary
         id: binary
         run: |

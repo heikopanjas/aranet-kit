@@ -27,14 +27,29 @@ jobs:
           swift build
           Scripts/verify-binary-architecture.sh "$(swift build --show-bin-path)/aranet-cli"
 
+      - name: Test with coverage
+        run: Scripts/check-coverage.sh
+
       - name: Build Release
         run: |
           swift build -c release
           Scripts/verify-binary-architecture.sh "$(swift build -c release --show-bin-path)/aranet-cli"
 
+  thread-sanitizer:
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: swift-actions/setup-swift@v2
+        with:
+          swift-version: "6.2"
+
+      - name: Test under Thread Sanitizer
+        run: swift test --sanitize=thread
+
   pre-release:
     if: github.ref == 'refs/heads/develop' && github.event_name == 'push'
-    needs: [build, lint]
+    needs: [build, lint, thread-sanitizer]
     runs-on: macos-15
     permissions:
       contents: write

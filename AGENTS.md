@@ -116,12 +116,12 @@ When initializing a session or analyzing the workspace, refer to instruction fil
 
 ### Testing
 
-The package currently has no test target. CI verifies that debug and release builds succeed, that the binary is `arm64` (`Scripts/verify-binary-architecture.sh`), and that sources pass strict swift-format linting. Bluetooth behavior is verified manually against real devices with `swift run aranet-cli <command> --verbose`.
-
-- Unit tests: `Tests/AranetKitTests/` and `Tests/AranetCliTests/` when added, covering byte parsing and unit conversion without Bluetooth hardware (load the `swift-testing-pro` skill); `TEST_PLAN.md` is the milestone plan for reaching 100% line coverage with protocol seams and fakes
-- Integration tests: manual runs against real devices; CoreBluetooth is not mocked
-- Test coverage requirements: none yet
-- Testing framework: Swift Testing
+- Testing framework: Swift Testing, run with `swift test`; load the `swift-testing-pro` skill before writing or reviewing tests
+- Layout: `Tests/AranetKitTests/` and `Tests/AranetCliTests/` mirror `Sources/`, with shared fixtures in `Fixtures/`, test doubles in `Fakes/`, and tags in `Tags.swift`; the CLI suite uses `@testable import AranetCli`
+- Tests first: add or update the test before the production change it covers
+- Coverage: `Scripts/check-coverage.sh` runs the suites with code coverage and fails below `COVERAGE_THRESHOLD` (default set in the script and raised per `TEST_PLAN.md` milestone, ending at 100); region coverage is reported but not gated; the only excluded file is the CoreBluetooth delegate adapter, which needs real peripherals
+- CI: `build.yml` runs the coverage script and a Thread Sanitizer job (`swift test --sanitize=thread`), the `release.yml` dry run runs `swift test`, and `lint.yml` lints `Tests` as well as `Sources`
+- Integration: manual runs against real devices with `swift run aranet-cli <command> --verbose`; CoreBluetooth is not mocked at the framework level, the `BluetoothCentral` seam is faked instead (from milestone M3 of `TEST_PLAN.md`)
 
 ### Documentation
 
