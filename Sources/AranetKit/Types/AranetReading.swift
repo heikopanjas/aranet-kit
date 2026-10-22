@@ -1,5 +1,5 @@
 //
-// AranetTypes.swift
+// AranetReading.swift
 // AranetKit
 //
 // Swift reimplementation of the Python aranet4 library
@@ -13,116 +13,11 @@
 
 import Foundation
 
-// MARK: - Device Types
-
-public enum AranetDeviceType: UInt8, Sendable {
-    case aranet4 = 0
-    case aranet2 = 1
-    case aranetRadiation = 2
-    case aranetRadon = 3
-    case unknown = 255
-
-    public var name: String {
-        switch self {
-            case .aranet4:
-                return "Aranet4"
-            case .aranet2:
-                return "Aranet2"
-            case .aranetRadiation:
-                return "Aranet Radiation"
-            case .aranetRadon:
-                return "Aranet Radon Plus"
-            case .unknown:
-                return "Unknown Aranet Device"
-        }
-    }
-}
-
-// MARK: - Status Colors
-
-public enum AranetStatusColor: UInt8, Sendable {
-    case error = 0
-    case green = 1
-    case yellow = 2
-    case red = 3
-
-    public var name: String {
-        switch self {
-            case .error:
-                return "ERROR"
-            case .green:
-                return "GREEN"
-            case .yellow:
-                return "YELLOW"
-            case .red:
-                return "RED"
-        }
-    }
-
-    /// Maps Aranet Radiation status byte to a status color.
-    ///
-    /// Aranet Radiation uses a different encoding than Aranet4:
-    /// 0x05 = Green, 0x0A = Yellow, 0x0B = Red.
-    public static func fromRadiationByte(_ byte: UInt8) -> AranetStatusColor? {
-        switch byte {
-            case 0x05: return .green
-            case 0x0A: return .yellow
-            case 0x0B: return .red
-            default: return nil
-        }
-    }
-}
-
-// MARK: - Status Alerts
-
-public enum AranetStatus: UInt8, Sendable {
-    case off = 0
-    case under = 1
-    case over = 2
-    case dash = 3
-
-    public var name: String {
-        switch self {
-            case .off:
-                return "OFF"
-            case .under:
-                return "UNDER"
-            case .over:
-                return "OVER"
-            case .dash:
-                return "DASH"
-        }
-    }
-}
-
-// MARK: - Device
-
-/// A discovered Aranet Bluetooth device.
-///
-/// This type abstracts away CoreBluetooth internals so consumers never need
-/// to import CoreBluetooth. Instances are created by ``AranetClient/scan(timeout:)``
-/// and passed back to ``AranetClient/readCurrentReadings(from:)`` or
-/// ``AranetClient/monitor(from:)``.
-public struct AranetDevice: Identifiable, Hashable, Sendable {
-    /// The device's unique Bluetooth identifier.
-    public let id: UUID
-
-    /// The device's advertised Bluetooth name (e.g. "Aranet4 1A2B3C").
-    public let name: String
-
-    public init(id: UUID, name: String) {
-        self.id = id
-        self.name = name
-    }
-}
-
-// MARK: - Current Reading
-
 /// A complete sensor reading from an Aranet device containing all available measurements and metadata.
 ///
 /// Different Aranet devices provide different sets of measurements. Optional properties indicate
 /// device-specific sensors that may not be present on all models.
-public struct AranetReading: Sendable {
+public struct AranetReading: Sendable, Equatable {
     /// The type of Aranet device that provided this reading.
     public let deviceType: AranetDeviceType
 

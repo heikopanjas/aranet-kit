@@ -7,6 +7,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.5.5] - 2026-10-22
+
+### Added
+
+- `AranetReading` conforms to `Equatable`
+- Parser tests for every documented payload layout, including truncated and oversized payloads
+
+### Changed
+
+- Payload parsing moved from `AranetClient` into the pure `AranetPayloadParser` with a bounds-checked `ByteReader`; every out-of-range read now throws `invalidData`
+- Hex dumps are produced by `PayloadHexDump` and printed by the client; the verbose radiation field echo was removed
+- `AranetTypes.swift` split into one file per type
+
+### Fixed
+
+- `UnitRadiationDose` and `UnitRadioactivity` restate `supportsSecureCoding`, so archiving them with `NSKeyedArchiver` no longer fails
+
 ## [3.5.4] - 2026-10-22
 
 ### Added

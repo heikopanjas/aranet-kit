@@ -556,16 +556,22 @@ public class AranetClient: NSObject, @unchecked Sendable {
             return
         }
 
+        if verbose == true {
+            for line in AranetPayloadParser.hexDumpLines(for: data, characteristic: operation.readingCharacteristicUUID) {
+                print("[DEBUG] \(line)")
+            }
+        }
+
         do {
             let name =
                 operation.deviceName.isEmpty
                 ? (operation.peripheral.name ?? "Unknown")
                 : operation.deviceName
-            let reading = try parseReading(
-                data: data,
+            let reading = try AranetPayloadParser.reading(
+                from: data,
+                characteristic: operation.readingCharacteristicUUID,
                 name: name,
-                version: operation.deviceVersion,
-                characteristicUUID: operation.readingCharacteristicUUID
+                version: operation.deviceVersion
             )
             let id = operation.peripheral.identifier
             operation.continuation?.resume(returning: reading)
@@ -875,257 +881,6 @@ extension AranetClient: CBPeripheralDelegate {
     public func peripheralIsReady(toSendWriteWithoutResponse peripheral: CBPeripheral) {
         if verbose == true {
             print("[DEBUG] Peripheral ready to send write without response")
-        }
-    }
-
-    // MARK: - Debug Helpers
-
-    private func printHexDump(
-        _ data: Data, title: String, fields: [(range: String, description: String)]
-    ) {
-        print("[DEBUG] === \(title) (\(data.count) bytes) ===")
-
-        for field in fields {
-            let parts = field.range.split(separator: "-")
-            guard let start = Int(parts[0]) else { continue }
-            let end = parts.count > 1 ? (Int(parts[1]) ?? start) : start
-
-            guard start < data.count else { continue }
-            let clampedEnd = min(end, data.count - 1)
-
-            let bytes = data[start ... clampedEnd]
-            let hex = bytes.map { String(format: "%02X", $0) }.joined(separator: " ")
-
-            var leValue: UInt64 = 0
-            for (i, byte) in bytes.enumerated() {
-                leValue |= UInt64(byte) << (i * 8)
-            }
-
-            let range = field.range.padding(toLength: 5, withPad: " ", startingAt: 0)
-            let hexVal = "\(hex) = \(leValue)"
-            print(
-                "[DEBUG] \(range)  \(hexVal.padding(toLength: 36, withPad: " ", startingAt: 0)) \(field.description)"
-            )
-        }
-
-        print("[DEBUG] ===")
-    }
-
-    private static let aranet4Fields: [(range: String, description: String)] = [
-        ("0-1", "CO2 (UInt16 LE, ppm)"),
-        ("2-3", "Temperature (UInt16 LE, raw/20)"),
-        ("4-5", "Pressure (UInt16 LE, raw/10 hPa)"),
-        ("6", "Humidity (UInt8, %)"),
-        ("7", "Battery (UInt8, %)"),
-        ("8", "Status (0=Err, 1=G, 2=Y, 3=R)"),
-        ("9-10", "Interval (UInt16 LE, sec)"),
-        ("11-12", "Ago (UInt16 LE, sec)")
-    ]
-
-    private static let radiationFields: [(range: String, description: String)] = [
-        ("0-1", "Device type + H"),
-        ("2-3", "Interval (UInt16 LE, sec)"),
-        ("4-5", "Ago (UInt16 LE, sec)"),
-        ("6", "Battery (UInt8, %)"),
-        ("7-10", "Rate (UInt32 LE, nSv/h)"),
-        ("11-18", "Total (UInt64 LE, nSv)"),
-        ("19-26", "Duration (UInt64 LE, sec)"),
-        ("27", "Status (0x05=G, 0x0A=Y, 0x0B=R)"),
-        ("28-35", "Total dose (UInt64 LE, uSv)"),
-        ("36-43", "Realtime duration (UInt64 LE, sec, 60s granularity)"),
-        ("44-47", "Reserved (zero)")
-    ]
-
-    // MARK: - Data Parsing
-
-    private func parseReading(
-        data: Data, name: String, version: String, characteristicUUID: CBUUID?
-    )
-        throws -> AranetReading
-    {
-        var offset = 0
-
-        func readUInt16LE() -> UInt16 {
-            let value = data.withUnsafeBytes { $0.loadUnaligned(fromByteOffset: offset, as: UInt16.self) }
-            offset += 2
-            return UInt16(littleEndian: value)
-        }
-
-        func readUInt32LE() -> UInt32 {
-            let value = data.withUnsafeBytes { $0.loadUnaligned(fromByteOffset: offset, as: UInt32.self) }
-            offset += 4
-            return UInt32(littleEndian: value)
-        }
-
-        func readUInt64LE() -> UInt64 {
-            let value = data.withUnsafeBytes { $0.loadUnaligned(fromByteOffset: offset, as: UInt64.self) }
-            offset += 8
-            return UInt64(littleEndian: value)
-        }
-
-        func readUInt8() -> UInt8 {
-            let value = data[offset]
-            offset += 1
-            return value
-        }
-
-        if characteristicUUID == AranetUUID.characteristicCurrentReadingsAR2
-            || characteristicUUID == AranetUUID.characteristicCurrentReadingsAR2Detailed
-        {
-            guard data.count >= 1 else {
-                throw AranetError.invalidData
-            }
-
-            let deviceTypeByte = readUInt8()
-            offset = 0
-
-            if deviceTypeByte == 4 {
-                // F0CD1504 (28 bytes): rate stored as nSv/h * 10
-                // F0CD3003 (48+ bytes): rate stored as nSv/h directly
-                let rateDivisor: Double
-                if data.count == 28 {
-                    rateDivisor = 10.0
-                }
-                else if data.count >= 48 {
-                    rateDivisor = 1.0
-                }
-                else {
-                    throw AranetError.invalidData
-                }
-
-                if verbose == true {
-                    printHexDump(data, title: "Aranet Radiation", fields: Self.radiationFields)
-                }
-
-                offset = 2
-                let interval = readUInt16LE()
-                let ago = readUInt16LE()
-                let battery = readUInt8()
-
-                if verbose == true {
-                    print("[DEBUG] Radiation parsing: interval=\(interval), ago=\(ago), battery=\(battery)")
-                }
-
-                let radiationRateRaw = readUInt32LE()
-                let radiationTotal = readUInt64LE()
-                let radiationDuration = readUInt64LE()
-
-                // Byte 27: status display color (different encoding than Aranet4)
-                let statusByte = readUInt8()
-                let status = AranetStatusColor.fromRadiationByte(statusByte)
-                if verbose == true {
-                    print(
-                        "[DEBUG] Radiation status byte: 0x\(String(format: "%02X", statusByte)) -> \(status?.name ?? "unknown")"
-                    )
-                }
-
-                let radiationRate = Measurement(
-                    value: Double(radiationRateRaw) / rateDivisor,
-                    unit: UnitRadiationDose.nanosieverts
-                )
-                let radiationTotalMeasurement = Measurement(
-                    value: Double(radiationTotal),
-                    unit: UnitRadiationDose.nanosieverts
-                )
-
-                return AranetReading(
-                    deviceType: .aranetRadiation,
-                    name: name,
-                    version: version,
-                    radiationRate: radiationRate,
-                    radiationTotal: radiationTotalMeasurement,
-                    radiationDuration: radiationDuration,
-                    battery: battery,
-                    status: status,
-                    interval: interval,
-                    ago: ago
-                )
-            }
-            // Aranet2 - first byte = 2
-            else if deviceTypeByte == 2 {
-                guard data.count >= 10 else {
-                    throw AranetError.invalidData
-                }
-
-                offset = 1
-                let interval = readUInt16LE()
-                let ago = readUInt16LE()
-                let battery = readUInt8()
-                let tempRaw = readUInt16LE()
-                let humidity = readUInt8()
-                let _ = readUInt8()
-
-                let temperatureValue = Double(tempRaw) / 20.0
-                let temperature = Measurement(value: temperatureValue, unit: UnitTemperature.celsius)
-
-                return AranetReading(
-                    deviceType: .aranet2,
-                    name: name,
-                    version: version,
-                    temperature: temperature,
-                    humidity: humidity,
-                    battery: battery,
-                    interval: interval,
-                    ago: ago
-                )
-            }
-            // Aranet Radon - first byte = 3 (not fully implemented yet)
-            else if deviceTypeByte == 3 {
-                throw AranetError.invalidData
-            }
-            else {
-                throw AranetError.invalidData
-            }
-        }
-        // Aranet4 format (F0CD3001 detailed or F0CD1503 basic)
-        else {
-            // F0CD1503 basic payload: CO2, temperature, pressure, humidity, battery, status (9 bytes)
-            guard data.count >= 9 else {
-                throw AranetError.invalidData
-            }
-
-            if verbose == true {
-                printHexDump(data, title: "Aranet4", fields: Self.aranet4Fields)
-            }
-
-            offset = 0
-            let co2 = readUInt16LE()
-            let tempRaw = readUInt16LE()
-            let pressureRaw = readUInt16LE()
-            let humidity = readUInt8()
-            let battery = readUInt8()
-            let statusRaw = readUInt8()
-
-            let temperatureValue = Double(tempRaw) / 20.0
-            let temperature = Measurement(value: temperatureValue, unit: UnitTemperature.celsius)
-
-            let pressureValue = Double(pressureRaw) / 10.0
-            let pressure = Measurement(value: pressureValue, unit: UnitPressure.hectopascals)
-
-            let status = AranetStatusColor(rawValue: statusRaw)
-
-            var interval: UInt16?
-            var ago: UInt16?
-
-            // F0CD3001 detailed payload appends interval and ago (13 bytes)
-            if data.count >= 13 {
-                interval = readUInt16LE()
-                ago = readUInt16LE()
-            }
-
-            return AranetReading(
-                deviceType: .aranet4,
-                name: name,
-                version: version,
-                temperature: temperature,
-                humidity: humidity,
-                co2: co2,
-                pressure: pressure,
-                battery: battery,
-                status: status,
-                interval: interval,
-                ago: ago
-            )
         }
     }
 }

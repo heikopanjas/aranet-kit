@@ -4,6 +4,15 @@ This file is the append-only log of project decisions and notable changes, maint
 
 <!-- {changelog} -->
 
+### 2026-10-22 10:28 (v3.5.5, pure payload parser)
+
+- extracted payload parsing into aranetpayloadparser with a bounds-checked bytereader and a wiredevicetype enum for the on-wire type byte; the client only calls the parser (test_plan.md milestone m1)
+- moved the hex dump into payloadhexdump with closedrange fields instead of strings parsed at runtime
+- split aranettypes.swift into one file per type under sources/aranetkit/types and made aranetreading equatable
+- fixed secure coding support on the custom units, found by the new archiving tests
+- rationale: the parser was private to the bluetooth-bound client and read unaligned memory behind hand-placed length guards; a pure parser is testable from byte fixtures and safe by construction
+- version bump: 3.5.4 to 3.5.5 (PATCH - internal refactor, additive conformance, bug fix)
+
 ### 2026-10-22 10:22 (v3.5.4, test infrastructure and first suites)
 
 - added swift testing targets for the library and the cli with suites for units, value types, errors, notifications, device matching, terminal output, and json output (test_plan.md milestone m0)
