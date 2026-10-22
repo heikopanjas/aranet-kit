@@ -36,7 +36,7 @@ struct CliEnvironment: Sendable {
     @TaskLocal static var current = CliEnvironment.live
 
     static let live = CliEnvironment(
-        makeClient: AranetClient.init,
+        makeClient: AranetClient.makeLive,
         write: { text in
             Swift.print(text, terminator: "")
             fflush(stdout)

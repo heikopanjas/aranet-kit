@@ -4,6 +4,7 @@ import Testing
 @testable import AranetKit
 
 /// The production sleep is the one seam the fakes replace; these tests cover the real one.
+@MainActor
 @Suite(.tags(.bluetooth), .timeLimit(.minutes(1)))
 struct AranetClientSleepTests {
     @Test("The system sleep suspends for at least the requested time")

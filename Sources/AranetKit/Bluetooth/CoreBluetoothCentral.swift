@@ -176,4 +176,9 @@ extension AranetClient {
     public convenience init() {
         self.init(central: CoreBluetoothCentral())
     }
+
+    /// Creates the production client for callers that inject a ``SensorClient``, such as `aranet-cli`.
+    public nonisolated static let makeLive: @MainActor @Sendable () -> any SensorClient = {
+        return AranetClient()
+    }
 }

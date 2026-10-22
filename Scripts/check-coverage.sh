@@ -31,12 +31,16 @@ if [[ ! -f "$CODECOV_JSON" ]]; then
     exit 1
 fi
 
-python3 -I - "$CODECOV_JSON" "$ROOT_DIR" "$THRESHOLD" "${EXCLUDED_FILES[@]}" <<'PYTHON'
+PROFDATA="$(dirname "$CODECOV_JSON")/default.profdata"
+TEST_BINARY=$(find "$(swift build --show-bin-path)" -path '*PackageTests.xctest/Contents/MacOS/*PackageTests' -type f | head -n 1 || true)
+
+python3 -I - "$CODECOV_JSON" "$ROOT_DIR" "$THRESHOLD" "${TEST_BINARY:-}" "$PROFDATA" "${EXCLUDED_FILES[@]}" <<'PYTHON'
 import json
+import subprocess
 import sys
 
-codecov_path, root_dir, threshold_text = sys.argv[1:4]
-excluded = set(sys.argv[4:])
+codecov_path, root_dir, threshold_text, test_binary, profdata = sys.argv[1:6]
+excluded = set(sys.argv[6:])
 threshold = float(threshold_text)
 
 with open(codecov_path, encoding="utf-8") as handle:
@@ -45,6 +49,23 @@ with open(codecov_path, encoding="utf-8") as handle:
 sources_prefix = root_dir.rstrip("/") + "/Sources/"
 rows = []
 uncovered = {}
+
+
+def uncovered_lines_from_llvm(filename):
+    """Lines llvm-cov itself reports with an execution count of zero, or None when llvm-cov is unavailable."""
+    if not test_binary:
+        return None
+    command = ["xcrun", "llvm-cov", "show", test_binary, "-instr-profile", profdata, filename]
+    try:
+        result = subprocess.run(command, capture_output=True, text=True, check=True)
+    except (OSError, subprocess.CalledProcessError):
+        return None
+    lines = []
+    for text in result.stdout.split("\n"):
+        fields = text.split("|")
+        if len(fields) >= 3 and fields[0].strip() == "0" and fields[1].strip().isdigit():
+            lines.append(int(fields[1]))
+    return lines
 
 
 def uncovered_lines(segments):
@@ -92,7 +113,8 @@ for data in export.get("data", []):
         skipped = relative in excluded
         rows.append((relative, line_count, line_covered, region_count, region_covered, skipped))
         if not skipped and line_covered < line_count:
-            uncovered[relative] = uncovered_lines(entry.get("segments", []))
+            exact = uncovered_lines_from_llvm(filename)
+            uncovered[relative] = exact if exact is not None else uncovered_lines(entry.get("segments", []))
         if skipped:
             continue
         total_lines += line_count

@@ -27,7 +27,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- `SensorClient` protocol, adopted by `AranetClient`, so consumers can inject a fake
+- `SensorClient` protocol, adopted by `AranetClient`, so consumers can inject a fake; `AranetClient.makeLive` is the production factory for such injection points
 - `AranetError.operationInProgress`, thrown when a device is read while a read of it is still running
 - `AranetError` conforms to `LocalizedError` and `CustomStringConvertible`, so `localizedDescription` carries the message
 - `aranet-cli read` and `aranet-cli monitor` accept `--timeout` for their internal scan, like `scan`

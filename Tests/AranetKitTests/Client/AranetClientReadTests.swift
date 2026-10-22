@@ -301,6 +301,71 @@ struct AranetClientReadTests {
         #expect(harness.log.contains("Read cancelled") == false)
     }
 
+    @Test("Peripherals without a name are logged as Unknown")
+    func unnamedPeripheral() async throws -> Void {
+        let harness = ClientHarness()
+        harness.central.retrievable[self.device.id] = PeripheralInfo(id: self.device.id, name: nil)
+        let task = await self.startRead(harness)
+
+        harness.completeAranet4Read(of: self.device.id)
+        let reading = try await task.value
+
+        #expect(reading.name == "Aranet4 1A2B3", "The GAP name read during the connection is used")
+        #expect(harness.log.contains("Resolved known peripheral without scanning: Unknown") == true)
+        #expect(harness.log.contains("Starting read from device: Unknown") == true)
+    }
+
+    @Test("A cancellation that loses the race against completion changes nothing")
+    func cancellationRacingCompletion() async throws -> Void {
+        let harness = ClientHarness()
+        harness.register(self.device)
+        let task = await self.startRead(harness)
+
+        task.cancel()
+        harness.completeAranet4Read(of: self.device.id)
+        let reading = try await task.value
+
+        #expect(reading.co2 == 812)
+        await settle("cancellation handled") { harness.gate.waiting == 0 }
+        #expect(harness.log.contains("Read cancelled") == false)
+        #expect(harness.central.count(of: .cancelConnection(self.device.id)) == 1)
+    }
+
+    @Test("A read completing after the pairing check cancels the timeout watchdog")
+    func completionAfterPairingCheck() async throws -> Void {
+        let harness = ClientHarness()
+        harness.register(self.device)
+        let task = await self.startRead(harness)
+        harness.gate.release()
+        await settle("timeout armed") { harness.gate.requestedDelays.count == 2 }
+
+        harness.completeAranet4Read(of: self.device.id)
+        let reading = try await task.value
+
+        #expect(reading.co2 == 812)
+        await settle("watchdog cancelled") { harness.gate.waiting == 0 }
+        #expect(harness.log.contains("Operation timed out") == false)
+    }
+
+    @Test("A watchdog waking after completion is harmless")
+    func lateWatchdogWake() async throws -> Void {
+        let harness = ClientHarness()
+        harness.gate.honorsCancellation = false
+        harness.register(self.device)
+        let task = await self.startRead(harness)
+        harness.gate.release()
+        await settle("timeout armed") { harness.gate.requestedDelays.count == 2 }
+        harness.completeAranet4Read(of: self.device.id)
+        _ = try await task.value
+        #expect(harness.gate.waiting == 1, "The watchdog ignores its cancellation and keeps sleeping")
+
+        harness.gate.release()
+        await settle("watchdog returned") { harness.gate.waiting == 0 }
+
+        #expect(harness.log.contains("Operation timed out") == false)
+        #expect(harness.central.count(of: .cancelConnection(self.device.id)) == 1)
+    }
+
     @Test("Events for peripherals without a read in progress are ignored")
     func strayEventsAreIgnored() async throws -> Void {
         let harness = ClientHarness()

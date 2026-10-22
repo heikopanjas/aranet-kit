@@ -85,7 +85,7 @@ public final class AranetClient {
     }
 
     /// The production `sleep`: suspends with `Task.sleep`, throwing `CancellationError` when the task is cancelled.
-    static func systemSleep(_ seconds: TimeInterval) async throws -> Void {
+    static let systemSleep: Sleep = { seconds in
         try await Task.sleep(for: .seconds(seconds))
     }
 

@@ -17,10 +17,11 @@ import os
 public enum AranetLog {
     public typealias Sink = @MainActor @Sendable (String) -> Void
 
-    private static let logger = Logger(subsystem: "com.panjas.aranet-kit", category: "client")
+    // OSLog handles are immutable and safe to share between threads; the type predates Sendable.
+    private nonisolated(unsafe) static let log = OSLog(subsystem: "com.panjas.aranet-kit", category: "client")
 
     /// Writes to the unified log at debug level.
     public static let standard: Sink = { message in
-        AranetLog.logger.debug("\(message, privacy: .public)")
+        os_log(.debug, log: AranetLog.log, "%{public}@", message)
     }
 }

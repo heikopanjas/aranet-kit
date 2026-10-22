@@ -7,7 +7,7 @@ This file is the append-only log of project decisions and notable changes, maint
 ### 2026-10-22 12:00 (v4.0.0, coverage gate at 100 percent)
 
 - raised coverage_threshold in scripts/check-coverage.sh to 100 and made the script list the uncovered line ranges of any file below it (test_plan.md milestone m5)
-- moved aranetclient.init() into corebluetoothcentral.swift so every corebluetooth construction sits in the single excluded file; the default sleep is the testable aranetclient.systemsleep; dead branches in the cli entry point and json error writer removed
+- moved aranetclient.init() and the new aranetclient.makelive factory into corebluetoothcentral.swift so every corebluetooth construction sits in the single excluded file; the log sink uses os_log so its message is evaluated eagerly; the default sleep is the testable aranetclient.systemsleep; dead branches in the cli entry point and json error writer removed
 - fixed the client suites to wait for the fake sleeper before releasing it (timer tasks start after their bluetooth command is recorded), serialized them, and made sleepgate report empty releases; exit tests skip themselves under thread sanitizer
 - rationale: the first green run reported 99.18 percent with 15 uncovered lines, all either corebluetooth construction, defaults the fakes replace, or unreachable branches
 - version: stays 4.0.0 (joins the unreleased major)
