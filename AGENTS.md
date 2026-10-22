@@ -103,7 +103,7 @@ When initializing a session or analyzing the workspace, refer to instruction fil
 - Keep device and protocol logic in `AranetKit`; `AranetCli` only parses commands and presents results
 - Parse BLE payloads according to **Aranet Device Data Formats** and expose physical quantities as described in **Swift Foundation Units**
 - **CLI output**: every subcommand honors `GlobalOptions` (`--verbose`, `--json`). JSON payloads must stay deterministic; progress spinners and human text never go to JSON output
-- Follow the **Release Process** for anything touching `.github/workflows/` or `scripts/`
+- Follow the **Release Process** for anything touching `.github/workflows/` or `Scripts/`
 
 ### Security & Safety
 
@@ -116,7 +116,7 @@ When initializing a session or analyzing the workspace, refer to instruction fil
 
 ### Testing
 
-The package currently has no test target. CI verifies that debug and release builds succeed, that the binary is `arm64` (`scripts/verify-binary-architecture.sh`), and that sources pass strict swift-format linting. Bluetooth behavior is verified manually against real devices with `swift run aranet-cli <command> --verbose`.
+The package currently has no test target. CI verifies that debug and release builds succeed, that the binary is `arm64` (`Scripts/verify-binary-architecture.sh`), and that sources pass strict swift-format linting. Bluetooth behavior is verified manually against real devices with `swift run aranet-cli <command> --verbose`.
 
 - Unit tests: `Tests/AranetKitTests/` when added, covering byte parsing and unit conversion without Bluetooth hardware (load the `swift-testing-pro` skill)
 - Integration tests: manual runs against real devices; CoreBluetooth is not mocked
@@ -128,7 +128,7 @@ The package currently has no test target. CI verifies that debug and release bui
 - Code comments: explain why, not what; keep them sparse
 - API documentation: DocC `///` comments on every public declaration in `AranetKit`
 - README updates: required whenever commands, flags, output formats, installation, or public API change
-- Release notes: `CHANGELOG.md` (Keep a Changelog format) feeds the GitHub release notes via `scripts/changelog-section.sh`; add a section for every version bump
+- Release notes: `CHANGELOG.md` (Keep a Changelog format) feeds the GitHub release notes via `Scripts/changelog-section.sh`; add a section for every version bump
 - Decision log: maintained in `UPDATES.md` (see the `recent-updates` skill)
 
 <!-- {languages} -->
@@ -515,7 +515,7 @@ xcrun swift-format format --configuration .swift-format --in-place --recursive S
 xcrun swift-format lint --configuration .swift-format --recursive --strict Sources
 
 # Verify the arm64 release artifact
-scripts/verify-binary-architecture.sh "$(swift build -c release --show-bin-path)/aranet-cli"
+Scripts/verify-binary-architecture.sh "$(swift build -c release --show-bin-path)/aranet-cli"
 ```
 
 **Important**: Always use debug builds (`swift build`) during development. Debug builds compile faster and include debugging symbols. Only use release builds (`swift build -c release`) for final testing or deployment. CI builds are Apple Silicon `arm64` only; do not add universal (`--arch x86_64`) builds.
@@ -549,13 +549,13 @@ scripts/verify-binary-architecture.sh "$(swift build -c release --show-bin-path)
 ### Architecture and Artifacts
 
 - All CI binaries are Apple Silicon `arm64`; every build verifies the Mach-O architecture
-  with `scripts/verify-binary-architecture.sh`.
+  with `Scripts/verify-binary-architecture.sh`.
 - Release assets are `aranet-cli-<version>-macos-arm64.tar.gz` and `SHA256SUMS.txt`.
 - The pre-built executable supports Apple Silicon Macs only. Intel users build from source.
 - `AranetKit` is distributed as source through the release tag. Do not publish an
   `.xcframework` or DocC archive unless this decision changes.
-- `scripts/extract-version.sh`, `scripts/changelog-section.sh`,
-  `scripts/verify-version.sh`, and `scripts/package-release.sh` are the shared release
+- `Scripts/extract-version.sh`, `Scripts/changelog-section.sh`,
+  `Scripts/verify-version.sh`, and `Scripts/package-release.sh` are the shared release
   implementation. Keep workflows DRY by updating these helpers rather than duplicating logic.
 
 ### Signing and Notarization
@@ -584,16 +584,16 @@ scripts/verify-binary-architecture.sh "$(swift build -c release --show-bin-path)
 
 ```bash
 # Print the canonical CLI version
-scripts/extract-version.sh
+Scripts/extract-version.sh
 
 # Verify toolVersion and CHANGELOG agree
-scripts/verify-version.sh
+Scripts/verify-version.sh
 
 # Extract one release-notes section
-scripts/changelog-section.sh 3.5.1
+Scripts/changelog-section.sh 3.5.1
 
 # Package an already-built signed executable
-scripts/package-release.sh 3.5.1 /path/to/aranet-cli
+Scripts/package-release.sh 3.5.1 /path/to/aranet-cli
 ```
 
 ## Commit Protocol

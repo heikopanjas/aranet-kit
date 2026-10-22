@@ -4,6 +4,14 @@ This file is the append-only log of project decisions and notable changes, maint
 
 <!-- {changelog} -->
 
+### 2026-10-22 11:41 (v3.5.2, scripts directory renamed to Scripts)
+
+- renamed the scripts directory to Scripts with a two-step git mv through a temporary name, because core.ignorecase is true on macOS and a direct case-only rename is not recorded
+- updated helper paths in AGENTS.md, build.yml, release.yml, and Scripts/verify-version.sh
+- older log entries keep the lowercase path because the log is append-only
+- rationale: match the PascalCase top-level directory naming used by Sources
+- version bump: none (no code change)
+
 ### 2026-10-22 11:21 (v3.5.2, coding standards and semver handed to skills)
 
 - removed the project code style (explicit booleans, DRY, single-condition guards), code review checklist, and formatting and documentation rules from AGENTS.md; the swift-coding-conventions skill now governs them

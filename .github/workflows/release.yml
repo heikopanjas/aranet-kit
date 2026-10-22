@@ -68,13 +68,13 @@ jobs:
             exit 0
           fi
 
-          VERSION=$(scripts/verify-version.sh)
+          VERSION=$(Scripts/verify-version.sh)
           if git rev-parse --verify --quiet "refs/tags/v$VERSION" >/dev/null; then
             echo "error: tag v$VERSION already exists" >&2
             exit 1
           fi
 
-          scripts/changelog-section.sh "$VERSION" > release-notes.md
+          Scripts/changelog-section.sh "$VERSION" > release-notes.md
           echo "release=true" >> "$GITHUB_OUTPUT"
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
 
@@ -104,11 +104,11 @@ jobs:
         run: |
           swift build -c release --product aranet-cli
           BINARY="$(swift build -c release --show-bin-path)/aranet-cli"
-          scripts/verify-binary-architecture.sh "$BINARY"
+          Scripts/verify-binary-architecture.sh "$BINARY"
           echo "path=$BINARY" >> "$GITHUB_OUTPUT"
 
       - name: Package dry-run artifacts
-        run: scripts/package-release.sh "${{ needs.validate.outputs.version }}" "${{ steps.binary.outputs.path }}"
+        run: Scripts/package-release.sh "${{ needs.validate.outputs.version }}" "${{ steps.binary.outputs.path }}"
 
       - name: Upload dry-run artifacts
         uses: actions/upload-artifact@v4
@@ -171,7 +171,7 @@ jobs:
         run: |
           swift build -c release --product aranet-cli
           BINARY="$(swift build -c release --show-bin-path)/aranet-cli"
-          scripts/verify-binary-architecture.sh "$BINARY"
+          Scripts/verify-binary-architecture.sh "$BINARY"
           cp "$BINARY" "$RUNNER_TEMP/aranet-cli"
           echo "path=$RUNNER_TEMP/aranet-cli" >> "$GITHUB_OUTPUT"
 
@@ -228,7 +228,7 @@ jobs:
           fi
 
       - name: Package release artifacts
-        run: scripts/package-release.sh "${{ needs.validate.outputs.version }}" "${{ steps.binary.outputs.path }}"
+        run: Scripts/package-release.sh "${{ needs.validate.outputs.version }}" "${{ steps.binary.outputs.path }}"
 
       - name: Complete release notes
         env:
