@@ -1079,7 +1079,8 @@ extension AranetClient: CBPeripheralDelegate {
         }
         // Aranet4 format (F0CD3001 detailed or F0CD1503 basic)
         else {
-            guard data.count >= 7 else {
+            // F0CD1503 basic payload: CO2, temperature, pressure, humidity, battery, status (9 bytes)
+            guard data.count >= 9 else {
                 throw AranetError.invalidData
             }
 
@@ -1106,7 +1107,8 @@ extension AranetClient: CBPeripheralDelegate {
             var interval: UInt16?
             var ago: UInt16?
 
-            if data.count >= 11 {
+            // F0CD3001 detailed payload appends interval and ago (13 bytes)
+            if data.count >= 13 {
                 interval = readUInt16LE()
                 ago = readUInt16LE()
             }

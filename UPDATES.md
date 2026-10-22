@@ -4,6 +4,16 @@ This file is the append-only log of project decisions and notable changes, maint
 
 <!-- {changelog} -->
 
+### 2026-10-22 11:46 (v3.5.3, aranet4 payload bounds and protocol docs)
+
+- fixed aranet4 parsing: payloads shorter than 9 bytes now throw invalidData instead of crashing on byte 8, and interval and ago are only read from full 13-byte payloads instead of from 11 bytes
+- protocol docs: added a characteristic-to-device table, device dispatch by byte 0, and a note that on-wire device type bytes differ from AranetDeviceType raw values
+- protocol docs: documented the 28-byte aranet radiation F0CD1504 variant, byte 1 of F0CD3003, and the corrected public dose limit of 1 mSv
+- protocol docs: marked the aranet2 layout as unverified because its python struct and byte table disagree, and marked radon plus as not implemented; the mission statement no longer claims radon plus readings
+- made the unit examples compile by unwrapping optionals
+- rationale: a consistency review found out-of-bounds reads in the parser and contradictions in the protocol reference
+- version bump: 3.5.2 to 3.5.3 (PATCH - bug fix without API change)
+
 ### 2026-10-22 11:41 (v3.5.2, scripts directory renamed to Scripts)
 
 - renamed the scripts directory to Scripts with a two-step git mv through a temporary name, because core.ignorecase is true on macOS and a direct case-only rename is not recorded

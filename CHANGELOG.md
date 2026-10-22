@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.5.3] - 2026-10-22
+
+### Fixed
+
+- Aranet4 payloads shorter than 9 bytes are rejected as invalid data instead of crashing
+- Interval and ago are only read from Aranet4 payloads with the full 13 bytes, preventing out-of-bounds reads on 11- or 12-byte payloads
+
 ## [3.5.2] - 2026-07-26
 
 ### Changed
@@ -185,7 +192,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Troubleshooting guide
 - Development setup instructions
 
-[Unreleased]: https://github.com/heikopanjas/aranet-kit/compare/v3.5.2...HEAD
+[Unreleased]: https://github.com/heikopanjas/aranet-kit/compare/v3.5.3...HEAD
+[3.5.3]: https://github.com/heikopanjas/aranet-kit/compare/v3.5.2...v3.5.3
 [3.5.2]: https://github.com/heikopanjas/aranet-kit/compare/v3.5.1...v3.5.2
 [3.5.1]: https://github.com/heikopanjas/aranet-kit/compare/v3.5.0...v3.5.1
 [3.5.0]: https://github.com/heikopanjas/aranet-kit/compare/v3.4.0...v3.5.0

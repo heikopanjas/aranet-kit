@@ -14,7 +14,7 @@ Run `/init-session` at the beginning of each new session, OR read this entire fi
 
 ## Mission Statement
 
-**AranetKit** is a Swift library and **aranet-cli** a command-line tool for reading Aranet4, Aranet2, Aranet Radiation, and Aranet Radon Plus Bluetooth LE sensors. It is a native Swift reimplementation of the Python `aranet4` library, offering async/await APIs and type-safe measurements without requiring device pairing.
+**AranetKit** is a Swift library and **aranet-cli** a command-line tool for reading Aranet4, Aranet2, and Aranet Radiation Bluetooth LE sensors. Aranet Radon Plus is recognized but its readings are not parsed yet. It is a native Swift reimplementation of the Python `aranet4` library, offering async/await APIs and type-safe measurements without requiring device pairing.
 
 Key features:
 
@@ -234,8 +234,9 @@ let reading = try await client.readCurrentReadings(from: device)
 let tempC = reading.temperature?.value
 
 // Convert to different unit
-let tempF = reading.temperature?.converted(to: .fahrenheit)
-print("Temperature: \(tempF.value)°F")
+if let tempF = reading.temperature?.converted(to: .fahrenheit) {
+    print("Temperature: \(tempF.value)°F")
+}
 ```
 
 ### Custom Unit Types
@@ -260,18 +261,20 @@ Measures ionizing radiation dose with base unit nanosieverts (nSv).
 let rateNsv = reading.radiationRate?.value
 
 // Convert to microsieverts for display
-let rateMicroSv = reading.radiationRate?.converted(to: .microsieverts)
-print("Dose rate: \(rateMicroSv.value) µSv/h")
+if let rateMicroSv = reading.radiationRate?.converted(to: .microsieverts) {
+    print("Dose rate: \(rateMicroSv.value) µSv/h")
+}
 
 // Cumulative dose
-let totalMsv = reading.radiationTotal?.converted(to: .millisieverts)
-print("Total dose: \(totalMsv.value) mSv")
+if let totalMsv = reading.radiationTotal?.converted(to: .millisieverts) {
+    print("Total dose: \(totalMsv.value) mSv")
+}
 ```
 
 **Typical values:**
 
 - Background radiation: 50-200 nSv/h (0.05-0.2 µSv/h)
-- Annual limit (public): ~100 µSv
+- Annual effective dose limit (public): 1 mSv (1000 µSv)
 
 #### UnitRadioactivity
 
@@ -289,8 +292,9 @@ Measures radon gas concentration with base unit becquerels per cubic meter (Bq/m
 let radonBq = reading.radonConcentration?.value
 
 // Convert to picocuries per liter
-let radonPci = reading.radonConcentration?.converted(to: .picocuriesPerLiter)
-print("Radon: \(radonPci.value) pCi/L")
+if let radonPci = reading.radonConcentration?.converted(to: .picocuriesPerLiter) {
+    print("Radon: \(radonPci.value) pCi/L")
+}
 ```
 
 **Reference levels:**
@@ -319,7 +323,7 @@ When parsing raw BLE data, values are converted to their native units:
 - Pressure: raw value / 10.0 → hectopascals (hPa)
 - Radiation rate: raw value or (raw value / 10.0) → nanosieverts per hour (nSv/h)
 - Radiation total: raw value → nanosieverts (nSv)
-- Radon concentration: raw value → becquerels per cubic meter (Bq/m³)
+- Radon concentration: raw value → becquerels per cubic meter (Bq/m³) (planned; Radon Plus payloads are not parsed yet)
 
 ## Aranet Device Data Formats
 
@@ -327,10 +331,26 @@ This section provides detailed byte-level documentation for all Aranet device da
 
 ### Overview
 
-Aranet devices use Bluetooth Low Energy (BLE) characteristics to transmit sensor data. Different characteristics provide different levels of detail:
+Aranet devices use Bluetooth Low Energy (BLE) characteristics to transmit sensor data. The **detailed** characteristics (F0CD3001, F0CD3003) need no pairing; the **basic** ones (F0CD1503, F0CD1504) require pairing. All characteristics except F0CD1503 include interval and ago values.
 
-- **Detailed characteristics** (F0CD3001, F0CD3003): Provide full sensor data including interval and ago values, no pairing required
-- **Basic characteristics** (F0CD1503, F0CD1504): Provide core sensor data, may require pairing
+| Characteristic | Devices | Payload size | Pairing | Notes |
+| --- | --- | --- | --- | --- |
+| F0CD3001 | Aranet4 | 13 bytes | No | Preferred for Aranet4 |
+| F0CD1503 | Aranet4 | 9 bytes | Yes | No interval or ago |
+| F0CD1504 | Aranet2, Aranet Radiation | 10 bytes (Aranet2), 28 bytes (Radiation) | Yes | Radiation rate stored as nSv/h × 10 |
+| F0CD3003 | Aranet2, Aranet Radiation | Aranet2 assumed same as F0CD1504, 48 bytes (Radiation) | No | Radiation rate stored as nSv/h |
+
+**Characteristic selection:** `AranetUUID.readingCharacteristicPriority` reads the first available characteristic in the order F0CD3001, F0CD3003, F0CD1504, F0CD1503.
+
+**Device dispatch:** F0CD3001 and F0CD1503 are always parsed as Aranet4. For F0CD1504 and F0CD3003, byte 0 is the on-wire device type:
+
+| Byte 0 | Device | Parser behavior |
+| --- | --- | --- |
+| `0x02` | Aranet2 | Parsed with the F0CD1504 layout (unverified, see below) |
+| `0x03` | Aranet Radon Plus | Not implemented; throws `AranetError.invalidData` |
+| `0x04` | Aranet Radiation | 28 bytes → rate ÷ 10; 48+ bytes → rate as-is; any other length throws `AranetError.invalidData` |
+
+**Note:** these on-wire device type bytes are unrelated to the raw values of the `AranetDeviceType` enum (`aranet4 = 0`, `aranet2 = 1`, `aranetRadiation = 2`, `aranetRadon = 3`). Never convert one into the other with `init(rawValue:)`.
 
 ### Aranet4 Device Formats
 
@@ -401,8 +421,10 @@ Byte 8:      Status (UInt8) - status color/alert (0=Error, 1=Green, 2=Yellow, 3=
 
 #### F0CD1504 - Current Readings (10 bytes)
 
+> **Unverified:** this layout has not been confirmed with a hex dump from a real Aranet2. The Python struct format `<HHHBHHB` describes 12 bytes (a 2-byte first field, interval at bytes 2-3, and a 2-byte humidity), which contradicts the 10-byte table below. The parser follows the table. Capture a payload from a real device before relying on or changing this section.
+
 **Characteristic UUID:** `F0CD1504-95DA-4F4B-9AC8-AA55D312AF0C`
-**Python struct format:** `<HHHBHHB`
+**Python struct format:** `<HHHBHHB` (conflicts with the table, see above)
 **Total size:** 10 bytes (device type byte + 9 data bytes)
 **Pairing required:** Yes (for F0CD1504), No (for F0CD3003 detailed variant)
 
@@ -431,9 +453,11 @@ let humidity = readUInt8()       // Byte 8
 let statusRaw = readUInt8()      // Byte 9
 
 let temperature = Double(tempRaw) / 20.0
-let statusHumidity = Status(rawValue: statusRaw & 0b0011)
-let statusTemperature = Status(rawValue: (statusRaw & 0b1100) >> 2)
+let statusHumidity = AranetStatus(rawValue: statusRaw & 0b0011)
+let statusTemperature = AranetStatus(rawValue: (statusRaw & 0b1100) >> 2)
 ```
+
+**Note:** the parser currently reads and discards the status byte; `AranetReading` has no field for the Aranet2 humidity and temperature status bits.
 
 ---
 
@@ -454,7 +478,7 @@ The first 28 bytes follow the same `<HHHBIQQB` format as F0CD1504:
 
 ```
 Byte 0:     Device type (0x04 = Aranet Radiation)
-Bytes 0-1:  First H (UInt16 LE) - includes device type byte, value[0] in Python struct unpack
+Byte 1:     Unknown, not decoded (Python unpacks bytes 0-1 together as value[0])
 Bytes 2-3:  Interval (UInt16 LE) - measurement interval in seconds (value[1] in Python)
 Bytes 4-5:  Ago (UInt16 LE) - seconds since last update (value[2] in Python)
 Byte 6:     Battery (UInt8) - battery level percentage (0-100) (value[3] in Python)
@@ -470,7 +494,7 @@ Bytes 36-43: Realtime duration (UInt64 LE) - elapsed time in seconds, 60s granul
 Bytes 44-47: Reserved (zero)
 ```
 
-**Note:** The Python struct format `<HHHBIQQB` unpacks bytes 0-27, where the first `H` (bytes 0-1) includes the device type byte. When parsing in Swift, skip bytes 0-1 (set offset = 2), then read interval from bytes 2-3 and ago from bytes 4-5.
+**Note:** The Python struct format `<HHHBIQQB` unpacks bytes 0-27, where the first `H` covers the device type (byte 0) and the undecoded byte 1. The Swift parser reads byte 0 for device dispatch, then skips to offset 2 and reads interval from bytes 2-3 and ago from bytes 4-5.
 
 **Important Notes:**
 
@@ -481,7 +505,11 @@ Bytes 44-47: Reserved (zero)
 - **Status**: Byte 27 encodes the status display color using a different scheme than Aranet4 (0x05=Green, 0x0A=Yellow, 0x0B=Red). The Python library reads this byte but does not use it.
 - **Extended data (bytes 28-47)**: Contains lower-resolution duplicates -- total dose in µSv (bytes 28-35) and a real-time duration counter with 60-second granularity (bytes 36-43). Bytes 44-47 are reserved (zero). The Python library ignores all 20 bytes.
 
-**Comparison with F0CD1504:**
+#### F0CD1504 - Radiation Current Readings (28 bytes)
+
+Aranet Radiation also answers on F0CD1504 with a 28-byte payload. Bytes 0-27 use the same layout as F0CD3003 above, with one difference: the rate at bytes 7-10 is stored as nSv/h × 10, so the parser divides it by 10. Bytes 28-47 are absent. Reading F0CD1504 requires pairing.
+
+**Comparison:**
 
 - F0CD1504: 28 bytes, rate stored as nSv/h × 10, requires pairing
 - F0CD3003: 48 bytes, rate stored as nSv/h, no pairing required
@@ -498,6 +526,12 @@ let radiationTotal = readUInt64LE()    // Read bytes 11-18 (value[5] in Python, 
 let radiationDuration = readUInt64LE() // Read bytes 19-26 (value[6] in Python, seconds)
 // Store rate as-is in nSv/h (formatOutput converts to µSv/h)
 ```
+
+---
+
+### Aranet Radon Plus Device Format
+
+> **Not implemented, unverified:** Aranet Radon Plus reports device type `0x03` in byte 0 of F0CD1504/F0CD3003. The payload layout is undocumented here and the parser throws `AranetError.invalidData` for it. Capture a hex dump from a real device and document the layout before implementing parsing.
 
 ## Project Build Commands
 

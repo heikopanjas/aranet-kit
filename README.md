@@ -49,7 +49,7 @@ To use the library in your own project, add it to your `Package.swift`:
 
 ```swift
 dependencies: [
-    .package(url: "https://github.com/heikopanjas/aranet-kit.git", from: "3.5.2")
+    .package(url: "https://github.com/heikopanjas/aranet-kit.git", from: "3.5.3")
 ]
 ```
 
@@ -354,7 +354,7 @@ The core Bluetooth functionality is available as a Swift package that can be imp
 ```swift
 // In your Package.swift
 dependencies: [
-    .package(url: "https://github.com/heikopanjas/aranet-kit.git", from: "3.5.2")
+    .package(url: "https://github.com/heikopanjas/aranet-kit.git", from: "3.5.3")
 ],
 targets: [
     .target(
